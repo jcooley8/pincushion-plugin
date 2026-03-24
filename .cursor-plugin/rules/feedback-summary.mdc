@@ -1,0 +1,8 @@
+---
+description: High-level Pincushion feedback summary — open counts, stale pins, busiest pages, and suggested priority
+alwaysApply: false
+---
+
+Use the pincushion MCP tool `get_feedback_summary` to get a project-wide overview.
+
+Show: total open pins by status, pages with most unresolved feedback, pins open more than 3 days (flag as stale), pins with active discussion and no agent response. End with a suggested priority order and reason.

@@ -1,0 +1,8 @@
+---
+description: Show Pincushion feedback pins where I've been @mentioned — ask for my username first
+alwaysApply: false
+---
+
+Ask me for my username if I haven't provided one. Then use the pincushion MCP tool `get_actionable_pins` with `mentionedUser` set to my username.
+
+Show results as a prioritized list: pin ID, page URL, who left the feedback, their comment, and how long ago. Flag any in "review" status. Offer to claim the top priority item.

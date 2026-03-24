@@ -1,0 +1,11 @@
+---
+description: Claim and resolve a Pincushion feedback pin — ask for pin ID, show full details, then close it
+alwaysApply: false
+---
+
+Ask me for the pin ID if I haven't provided one (or run `get_actionable_pins` and let me pick). Then:
+1. Show the full pin details — original comment, thread replies, current status
+2. Use `claim_pin` to claim it
+3. Ask what was done to address the feedback (I can say "done" to auto-generate from recent git changes)
+4. Use `fix_and_resolve` or `resolve_annotation` to mark it resolved with a note
+5. Confirm it's closed

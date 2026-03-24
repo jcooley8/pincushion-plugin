@@ -1,0 +1,20 @@
+{
+  "name": "pincushion",
+  "displayName": "Pincushion MCP Server",
+  "description": "Connects Cursor to your Pincushion project. Exposes tools to fetch pins, claim work, post replies, and resolve feedback.",
+  "command": "npx",
+  "args": ["pincushion-mcp", "--project-dir", "${workspaceFolder}"],
+  "env": {},
+  "tools": [
+    "get_actionable_pins",
+    "get_feedback_summary",
+    "search_annotations",
+    "get_component_feedback",
+    "claim_pin",
+    "add_agent_reply",
+    "resolve_annotation",
+    "fix_and_resolve",
+    "add_member",
+    "list_members"
+  ]
+}

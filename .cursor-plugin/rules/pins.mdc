@@ -1,0 +1,10 @@
+---
+description: Show all open Pincushion feedback pins for this project, grouped by page
+alwaysApply: false
+---
+
+Use the pincushion MCP tool `get_actionable_pins` to fetch all open feedback pins.
+
+Display results grouped by page URL. For each pin show: ID, status, author, and the first line of their comment. Flag any with unread thread replies.
+
+After listing, ask if I want to claim or resolve any of them.

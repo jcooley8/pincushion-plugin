@@ -1,0 +1,23 @@
+{
+  "name": "pincushion",
+  "displayName": "Pincushion Feedback",
+  "description": "View, claim, and resolve stakeholder feedback pins directly in Cursor. Installs the Pincushion MCP server and adds /pins, /my-pins, /resolve, and /feedback-summary slash commands.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Josh Cooley",
+    "url": "https://pincushion.io"
+  },
+  "license": "MIT",
+  "homepage": "https://pincushion.io",
+  "repository": "https://github.com/jcooley8/pincushion",
+  "keywords": ["feedback", "mcp", "pins", "stakeholder", "review", "ai-agent"],
+  "components": {
+    "mcp": ["mcp/pincushion.json"],
+    "rules": [
+      "rules/pins.mdc",
+      "rules/my-pins.mdc",
+      "rules/resolve.mdc",
+      "rules/feedback-summary.mdc"
+    ]
+  }
+}
