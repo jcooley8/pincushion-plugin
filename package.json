@@ -1,0 +1,73 @@
+{
+  "name": "pincushion-mcp",
+  "version": "1.3.5",
+  "mcpName": "io.github.jcooley8/pincushion",
+  "description": "Visual feedback as agent work packets. Stakeholders drop pins on your live app; your AI coding agent reads each pin (selector, screenshot, DOM, thread, acceptance criteria) via MCP and ships the fix.",
+  "type": "module",
+  "bin": {
+    "pincushion-mcp": "server.js"
+  },
+  "main": "./server.js",
+  "files": [
+    "server.js",
+    "lib/",
+    "docs/",
+    "server.json",
+    "README.md",
+    "CHANGELOG.md",
+    "SLACK_APP_DIRECTORY_PACKAGE.md",
+    "SLACK_APP_MANIFEST.yml",
+    "TEAMS_APP_MANIFEST.json",
+    "TEAMS_PARITY.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "agent-loop": "node agent-loop.mjs",
+    "test": "npm run test:smoke && npm run test:transport",
+    "test:smoke": "node tests/mcp-smoke.mjs",
+    "test:transport": "node --experimental-vm-modules node_modules/.bin/jest --testRunner=jest-circus/runner --runInBand tests/agent-loop.test.js",
+    "test:all": "node --experimental-vm-modules node_modules/.bin/jest --testRunner=jest-circus/runner --runInBand"
+  },
+  "jest": {
+    "transform": {}
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude-code",
+    "cursor",
+    "ai-coding-agent",
+    "visual-feedback",
+    "code-review",
+    "design-feedback",
+    "qa",
+    "pincushion",
+    "annotations",
+    "agent-work-packets"
+  ],
+  "author": "PinCushion Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcooley8/pincushion-plugin.git"
+  },
+  "homepage": "https://pincushion.io",
+  "bugs": {
+    "url": "https://github.com/jcooley8/pincushion-plugin/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@sentry/node": "^9.0.0"
+  },
+  "optionalDependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^21.0.0"
+  },
+  "devDependencies": {
+    "@jest/globals": "^30.3.0",
+    "jest": "^30.3.0"
+  }
+}

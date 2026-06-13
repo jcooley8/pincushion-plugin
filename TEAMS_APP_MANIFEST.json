@@ -1,0 +1,68 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.19/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.19",
+  "version": "1.0.0",
+  "id": "REPLACE_WITH_AZURE_AD_APP_ID",
+  "developer": {
+    "name": "Pincushion",
+    "websiteUrl": "https://pincushion.io",
+    "privacyUrl": "https://pincushion.io/privacy",
+    "termsOfUseUrl": "https://pincushion.io/terms",
+    "mpnId": ""
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Pincushion",
+    "full": "Pincushion - Visual Feedback to Teams"
+  },
+  "description": {
+    "short": "Visual feedback pins from your web apps, routed to Teams - notifications, replies, and a Home tab.",
+    "full": "Pincushion is a visual feedback annotation system. Stakeholders drop pins on any web page via a Chrome extension; developers (and their AI agents) read those pins and implement the fixes. With the Microsoft Teams app:\n\n- Notifications land in any channel when pins are ready, @-mentioned, or followed up\n- Direct messages when you are @-mentioned in a pin thread\n- Reply to a pin directly from the Teams thread - replies sync back as pin comments\n- A Home tab showing connected projects, open pins, and your @-mentions\n\nDefaults are intentionally low-noise: only mentions, ready pins, and follow-ups by default. Per-channel event subscriptions. Inline pin screenshots so reviewers see what was annotated without clicking through."
+  },
+  "accentColor": "#E84430",
+  "bots": [
+    {
+      "botId": "REPLACE_WITH_AZURE_BOT_APP_ID",
+      "scopes": ["team", "personal", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            { "title": "help", "description": "Show how to use Pincushion in Teams" },
+            { "title": "install", "description": "Get the install link for the Chrome extension" }
+          ]
+        }
+      ]
+    }
+  ],
+  "composeExtensions": [],
+  "staticTabs": [
+    {
+      "entityId": "pincushion-home",
+      "name": "Home",
+      "contentUrl": "https://pincushion.io/teams/home",
+      "websiteUrl": "https://pincushion.io",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "devicePermissions": [],
+  "validDomains": [
+    "pincushion.io",
+    "*.pincushion.io",
+    "dpsqzszdviltqvethxbr.supabase.co",
+    "dpsqzszdviltqvethxbr.functions.supabase.co",
+    "platform.slack-edge.com"
+  ],
+  "webApplicationInfo": {
+    "id": "REPLACE_WITH_AZURE_AD_APP_ID",
+    "resource": "api://pincushion.io/REPLACE_WITH_AZURE_AD_APP_ID"
+  },
+  "showLoadingIndicator": true,
+  "isFullScreen": false
+}
