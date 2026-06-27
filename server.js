@@ -509,10 +509,11 @@ async function reconcileApprovedQueue() {
 
 async function cloudSyncPush(annotation) {
   const licenseKey = resolveCloudSyncKey();
-  if (!licenseKey) return;
+  if (!licenseKey) return { ok: false, reason: 'no_license_key' };
 
+  let res;
   try {
-    await fetch(CLOUD_SYNC_URL, {
+    res = await fetch(CLOUD_SYNC_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -520,7 +521,20 @@ async function cloudSyncPush(annotation) {
       },
       body: JSON.stringify(annotation)
     });
-  } catch { /* cloud push failed — local copy is still intact */ }
+  } catch (err) {
+    return { ok: false, reason: 'network_error', detail: err?.message };
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    markCloudKeyRejected(licenseKey);
+    return { ok: false, reason: 'license_rejected', status: res.status };
+  }
+
+  if (!res.ok) {
+    return { ok: false, reason: 'server_error', status: res.status };
+  }
+
+  return { ok: true };
 }
 
 // Start cloud sync polling loop.
@@ -1125,10 +1139,20 @@ async function pincushionPendingBanner() {
 
 async function toolFixAndResolve({ annotationId, fixDescription, filePath, lineNumber, commitSha, branchName, prUrl }) {
   const result = await core.toolFixAndResolve(coreConfig, { annotationId, fixDescription, filePath, lineNumber, commitSha, branchName, prUrl }, SYNC_SERVER_URL ? fetchRemoteAnnotations : null);
-  // Push implementation status to cloud
-  if (result.success) {
+  if (result.success && CLOUD_SYNC) {
     const ann = await core.findAnnotationById(coreConfig, annotationId);
-    if (ann) cloudSyncPush(ann).catch(() => {});
+    if (ann) {
+      const syncResult = await cloudSyncPush(ann);
+      if (!syncResult.ok) {
+        result.cloudSynced = false;
+        result.cloudSyncError = syncResult.reason;
+        if (syncResult.reason === 'license_rejected') {
+          result.cloudSyncHint = "Run 'npx pincushion-mcp login' to refresh your session, then resolve again.";
+        }
+      } else {
+        result.cloudSynced = true;
+      }
+    }
   }
   return result;
 }
