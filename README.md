@@ -247,8 +247,9 @@ npx pincushion-mcp [flags]
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--project-dir PATH` | Root directory containing `.feedback/` | Current working directory |
-| `--sync-url URL` | Supabase API endpoint for remote sync | None (local only) |
-| `--api-key KEY` | API key for Supabase authentication | None |
+| `--cloud-sync` | Enable sync with Pincushion cloud (requires `pincushion login`) | Disabled |
+| `--sync-url URL` | Supabase API endpoint for self-hosted remote sync | None (local only) |
+| `--api-key KEY` | API key for self-hosted Supabase authentication | None |
 | `--license-key KEY` | Pro license key (optional) | None |
 | `--rest` | Enable REST API mode | Disabled (uses MCP/stdio) |
 | `--port PORT` | Port for REST API server | 3456 |
@@ -549,9 +550,40 @@ Each annotation file contains:
 
 ---
 
-## Supabase Sync
+## Cloud Sync (Zero-Config)
 
-To sync annotations with a remote Supabase database:
+The simplest way to sync resolved pins with the Pincushion cloud so the browser extension reflects changes automatically.
+
+**Step 1 — authenticate once per machine:**
+
+```bash
+npx pincushion-mcp login
+```
+
+This opens a browser sign-in page, performs Google OAuth, and saves a license key to `~/.pincushion/license-key`. You only need to do this once.
+
+**Step 2 — add `--cloud-sync` to your MCP config:**
+
+```json
+{
+  "mcpServers": {
+    "pincushion": {
+      "command": "npx",
+      "args": ["pincushion-mcp", "--project-dir", ".", "--cloud-sync"]
+    }
+  }
+}
+```
+
+Once enabled, `fix_and_resolve` pushes the resolved status to Pincushion's cloud and the browser extension reflects it within the next poll cycle. No Supabase account or API key required.
+
+> **Stale session:** If pins stop syncing after resolving them (browser extension still shows READY), re-run `npx pincushion-mcp login` to refresh the license key.
+
+---
+
+## Supabase Sync (Self-Hosted)
+
+To sync annotations with your own Supabase database:
 
 1. Set up a Supabase project at [supabase.com](https://supabase.com)
 2. Create an `annotations` table with columns matching the annotation schema
