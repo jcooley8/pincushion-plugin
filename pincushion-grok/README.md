@@ -7,23 +7,43 @@ This plugin is for the **Grok Build CLI**, not the Build tab on grok.com.
 ## Install
 
 Requires Grok Build with plugin support, Node **22.22+ within v22 or v24**, npm,
-and Chrome/Chromium for local captures. The adapter pins the published
-`pincushion-mcp@1.11.24`. The pinned release prevents a new project from being
+and Chrome/Chromium for local captures. The adapter requires the pinned
+`pincushion-mcp@1.11.24`. Confirm that `npm view pincushion-mcp@1.11.24 version`
+returns `1.11.24` before running the install sequence below. The pinned release
+prevents a new project from being
 registered during MCP startup; `/pincushion` registers it only after confirmation.
 
 From your app repository:
 
 ```sh
-grok plugin install 'jcooley8/pincushion-plugin#pincushion-grok'
-grok plugin details pincushion
-npm exec --yes --package=pincushion-mcp@1.11.24 -- node --version
-grok mcp doctor pincushion
-grok
+# Review the exact Git source before granting it trust.
+review_dir="$(mktemp -d)"
+git clone --depth 1 https://github.com/jcooley8/pincushion-plugin.git "$review_dir/pincushion-plugin"
+git -C "$review_dir/pincushion-plugin" log -1 --oneline -- pincushion-grok
+review_commit="$(git -C "$review_dir/pincushion-plugin" rev-parse HEAD)"
+printf 'Reviewed source commit: %s\n' "$review_commit"
+git -C "$review_dir/pincushion-plugin" ls-tree -r --name-only HEAD -- pincushion-grok
+find "$review_dir/pincushion-plugin/pincushion-grok" -type f -print -exec sed -n '1,260p' {} \;
+
+published_mcp_version="$(npm view pincushion-mcp@1.11.24 version 2>/dev/null || true)"
+if [ "$published_mcp_version" = "1.11.24" ]; then
+  grok plugin install "$review_dir/pincushion-plugin/pincushion-grok" --trust
+  grok plugin details pincushion
+  npm exec --yes --package=pincushion-mcp@1.11.24 -- node --version
+  grok mcp doctor pincushion
+  grok
+else
+  echo "Expected exact pincushion-mcp@1.11.24 on npm; that pinned version is not currently available. Stop until the pinned release is published." >&2
+fi
 ```
 
-Review Grok's plugin trust prompt. A marketplace listing is optional for direct
-installation; publication, marketplace submission and acceptance are separate.
-For a reviewed local checkout, use `grok plugin install /absolute/pincushion-grok`.
+The `--trust` flag records your approval of the reviewed local source, so inspect
+the listed files before running the install command. Installing the local
+checkout binds the trusted plugin to the exact `review_commit` printed above;
+the mutable `jcooley8/pincushion-plugin#pincushion-grok` shorthand is not used
+after review. A marketplace listing is optional for direct installation;
+publication, marketplace submission and acceptance are separate. For another
+reviewed local checkout, use `grok plugin install /absolute/pincushion-grok --trust`.
 Use `grok plugin update pincushion` for an available update.
 The npm command downloads the pinned MCP before Grok's short startup deadline;
 it prints the Node version without starting a project session. Let it finish
