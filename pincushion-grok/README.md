@@ -8,8 +8,8 @@ This plugin is for the **Grok Build CLI**, not the Build tab on grok.com.
 
 Requires Grok Build with plugin support, Node **22.22+ within v22 or v24**, npm,
 and Chrome/Chromium for local captures. The adapter requires the pinned
-`pincushion-mcp@1.11.24`. Confirm that `npm view pincushion-mcp@1.11.24 version`
-returns `1.11.24` before running the install sequence below. The pinned release
+`pincushion-mcp@1.11.26`. Confirm that `npm view pincushion-mcp@1.11.26 version`
+returns `1.11.26` before running the install sequence below. The pinned release
 prevents a new project from being
 registered during MCP startup; `/pincushion` registers it only after confirmation.
 
@@ -25,15 +25,15 @@ printf 'Reviewed source commit: %s\n' "$review_commit"
 git -C "$review_dir/pincushion-plugin" ls-tree -r --name-only HEAD -- pincushion-grok
 find "$review_dir/pincushion-plugin/pincushion-grok" -type f -print -exec sed -n '1,260p' {} \;
 
-published_mcp_version="$(npm view pincushion-mcp@1.11.24 version 2>/dev/null || true)"
-if [ "$published_mcp_version" = "1.11.24" ]; then
+published_mcp_version="$(npm view pincushion-mcp@1.11.26 version 2>/dev/null || true)"
+if [ "$published_mcp_version" = "1.11.26" ]; then
   grok plugin install "$review_dir/pincushion-plugin/pincushion-grok" --trust
   grok plugin details pincushion
-  npm exec --yes --package=pincushion-mcp@1.11.24 -- node --version
+  npm exec --yes --package=pincushion-mcp@1.11.26 -- node --version
   grok mcp doctor pincushion
   grok
 else
-  echo "Expected exact pincushion-mcp@1.11.24 on npm; that pinned version is not currently available. Stop until the pinned release is published." >&2
+  echo "Expected exact pincushion-mcp@1.11.26 on npm; that pinned version is not currently available. Stop until the pinned release is published." >&2
 fi
 ```
 
@@ -56,7 +56,7 @@ project/user MCP named `pincushion` overrides the plugin, inspect its origin wit
 before setup. For an explicit project binding, after choosing the app root:
 
 ```sh
-grok mcp add --scope project pincushion -- npx --yes pincushion-mcp@1.11.24 --project-dir /absolute/path/to/your-app --cloud-sync --no-auto-register-project
+grok mcp add --scope project pincushion -- npx --yes pincushion-mcp@1.11.26 --project-dir /absolute/path/to/your-app --cloud-sync --no-auto-register-project
 ```
 
 Do not commit account credentials. Run `/pincushion` in Grok to connect, confirm
@@ -72,6 +72,9 @@ flow. There is no embedded key and no separate Grok-specific Pincushion account.
 | `/pincushion-crit <URL>` | Inspect rendered desktop/mobile evidence and create up to three native pins |
 | `/pincushion-pins` | Read existing feedback without creating a Crit |
 | `/pincushion-implement` | Implement only approved pins when requested |
+
+Web Crit reports require complete desktop and mobile capture evidence for each
+screen. The report keeps positioned pins on both device views.
 
 The checkpoint skill suggests another Crit once after a completed UI work batch.
 It does not run a critique automatically. Suggestions depend on Grok invoking

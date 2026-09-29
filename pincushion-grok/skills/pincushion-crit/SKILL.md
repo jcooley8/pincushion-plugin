@@ -40,8 +40,8 @@ installed location; use its absolute path. Do not use the app's cwd as the plugi
 root. For a public HTTPS page, run the pinned package with argument-safe quoting:
 
 ```sh
-npm exec --yes --package=pincushion-mcp@1.11.24 -- node "/absolute/plugin/scripts/capture.mjs" "https://your-confirmed-page.example/" '{}' "/absolute/output/desktop.jpg" --allow-empty --viewport=1280x900
-npm exec --yes --package=pincushion-mcp@1.11.24 -- node "/absolute/plugin/scripts/capture.mjs" "https://your-confirmed-page.example/" '{}' "/absolute/output/mobile.jpg" --allow-empty --viewport=390x844 --device-class=mobile
+npm exec --yes --package=pincushion-mcp@1.11.26 -- node "/absolute/plugin/scripts/capture.mjs" "https://your-confirmed-page.example/" '{}' "/absolute/output/desktop.jpg" --allow-empty --viewport=1280x900
+npm exec --yes --package=pincushion-mcp@1.11.26 -- node "/absolute/plugin/scripts/capture.mjs" "https://your-confirmed-page.example/" '{}' "/absolute/output/mobile.jpg" --allow-empty --viewport=390x844 --device-class=mobile
 ```
 
 For an explicitly confirmed local preview at `http://localhost` or
@@ -51,7 +51,7 @@ register a URL; stop and return to setup if this binding is absent. Standard
 capture rejects loopback. Use the package's origin-bound Crit mode instead:
 
 ```sh
-npm exec --yes --package=pincushion-mcp@1.11.24 -- node "/absolute/plugin/scripts/capture.mjs" --critique "http://127.0.0.1:3000/" "/absolute/output/local-baseline" --page-only > "/absolute/output/local-baseline.json"
+npm exec --yes --package=pincushion-mcp@1.11.26 -- node "/absolute/plugin/scripts/capture.mjs" --critique "http://127.0.0.1:3000/" "/absolute/output/local-baseline" --page-only > "/absolute/output/local-baseline.json"
 ```
 
 This mode probes only the exact requested page and returns canonical desktop
@@ -74,7 +74,7 @@ runtime offline; it never changes or uploads the original capture. For example,
 to inspect the first 390×844 pixels of a mobile capture:
 
 ```sh
-npm exec --yes --package=pincushion-mcp@1.11.24 -- node "/absolute/plugin/scripts/inspection-crop.mjs" "/absolute/output/mobile.jpg" "/absolute/output/mobile-top.jpg" 0 0 390 844
+npm exec --yes --package=pincushion-mcp@1.11.26 -- node "/absolute/plugin/scripts/inspection-crop.mjs" "/absolute/output/mobile.jpg" "/absolute/output/mobile-top.jpg" 0 0 390 844
 ```
 
 Use the capture's actual pixel dimensions. For a hotspot farther down, choose
@@ -146,7 +146,7 @@ Zero findings is valid after successful inspection; do not manufacture
 findings to produce a report.
 
 For private pages, use the existing local browser-login flow only with owner
-authorization: `npx --yes pincushion-mcp@1.11.24 snapshot --login <URL>
+authorization: `npx --yes pincushion-mcp@1.11.26 snapshot --login <URL>
 --proof-selector '<signed-in-only-selector>'`. Supply its origin-bound local
 state through PINCUSHION_STORAGE_STATE and use `--require-auth` when capturing.
 Never print, upload or commit state/cookies. Do not work around CAPTCHA, denied
