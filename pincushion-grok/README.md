@@ -69,12 +69,16 @@ flow. There is no embedded key and no separate Grok-specific Pincushion account.
 | Command | Behavior |
 |---|---|
 | `/pincushion` | Connect the intended project and run its first confirmed Crit |
-| `/pincushion-crit <URL>` | Inspect rendered desktop/mobile evidence and create up to three native pins |
+| `/pincushion-crit <URL>` | Discover same-origin navigation pages, inspect desktop/mobile evidence, and aim for at least three distinct useful native pins when supported |
 | `/pincushion-pins` | Read existing feedback without creating a Crit |
 | `/pincushion-implement` | Implement only approved pins when requested |
 
 Web Crit reports require complete desktop and mobile capture evidence for each
-screen. The report keeps positioned pins on both device views.
+screen. Navigation destinations become separate Grid cards and evidenced Flow
+connections. Grid shows the full page without a nested scroll; Flow retains a
+scrollable capture for focused inspection. The report keeps positioned pins on
+both device views. If fewer than three real issues survive inspection, Crit
+reports that count rather than creating filler pins.
 
 The checkpoint skill suggests another Crit once after a completed UI work batch.
 It does not run a critique automatically. Suggestions depend on Grok invoking
