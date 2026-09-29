@@ -30,7 +30,9 @@ disable-model-invocation: true
    credentials, unrelated repositories or private customer records. If the
    brief cannot be grounded, stop before critique rather than inventing it.
 5. Explain the first Crit before asking for confirmation: project URLs and the
-   approved brand brief are stored by Pincushion; up to three AI findings with
+   approved brand brief are stored by Pincushion; Crit aims for at least three
+   distinct useful AI findings when the rendered evidence supports them, with
+   at most three per page. Findings with
    selectors and relevant element context are synced as pins accessible under
    the project's access settings. Grok processes the sources and screenshots
    it reads through the user's model session. Local screenshots stay local
