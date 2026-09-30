@@ -15,228 +15,37 @@ The loop closes itself: a stakeholder pins it → your agent reads it via MCP an
 
 This server is also how Pincushion AI runs design/copy/a11y critiques on a live page and writes the pins straight back onto it.
 
-## Installation
+## Hosted quick start
+
+Use Node.js 22.22+ within Node 22, or Node 24, and run this in your app's repository:
 
 ```bash
-# npm
-npm install -g pincushion-mcp
-
-# pnpm
-pnpm add -g pincushion-mcp
-
-# yarn
-yarn global add pincushion-mcp
+npx pincushion-mcp setup
 ```
 
-Or run directly without installing:
+The guided wizard signs you in to Pincushion, asks you to review the project URLs,
+and explicitly choose an editor. It writes supported project MCP configuration when
+safe; Manual, Skip, or a conflicting existing configuration can leave it unchanged.
+Restart the editor and ask your agent to call `get_project_context` and
+`get_actionable_pins`; configuration written alone does not verify a connection.
+If you already have a critique report, run its `npx pincushion-mcp claim <report-token>`
+command from the owning app's repository instead, then verify a real pin read.
 
-```bash
-# npm
-npx pincushion-mcp --project-dir .
+Pincushion hosts cloud sync. The normal setup does not require your own Supabase
+project, database table, or backend API key. Sign-in supplies the existing account's
+cloud credentials automatically; `npx pincushion-mcp login` is the recovery command
+if sign-in is missing or expired. Do not paste credentials into issue reports.
 
-# pnpm
-pnpm dlx pincushion-mcp --project-dir .
+Setup connects feedback access; it does not generate an AI critique. Critique execution
+requires a supported coding-agent workflow and real page captures. A public report
+lets reviewers add pins without an extension. Install the
+[optional Chrome extension](https://pincushion.io/install/chrome) only when you want
+to place feedback directly on other web pages.
 
-# yarn
-yarn dlx pincushion-mcp --project-dir .
-```
-
-## Quick Start
-
-### 1. Install the Browser Extension
-
-Download the Pincushion Chrome extension from [pincushion.io/install/chrome](https://pincushion.io/install/chrome).
-
-### 2. Configure Your Agent
-
-Pick your AI agent below and follow the configuration for your setup.
-
-### 3. Start Using
-
-Once configured, your agent can:
-- See all feedback: `get_feedback_summary`
-- Find specific pins: `search_annotations`
-- Fix and mark as done: `fix_and_resolve`
-
----
-
-## Agent Configuration Guides
-
-### Cursor
-
-**File:** `.cursor/mcp.json`
-
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "npx",
-      "args": ["pincushion-mcp", "--project-dir", "."]
-    }
-  }
-}
-```
-
-> **pnpm / yarn users:** replace `"command": "npx"` with `"command": "pnpm"` and add `"dlx"` as the first arg, or use `"command": "yarn"` with `"dlx"` likewise.
-
-**With Supabase sync:**
-
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "npx",
-      "args": [
-        "pincushion-mcp",
-        "--project-dir", ".",
-        "--sync-url", "https://your-supabase.com/api",
-        "--api-key", "YOUR_API_KEY"
-      ]
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-**File:** `~/.config/Claude/claude_desktop_config.json` (Linux/Windows)
-or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
-
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "npx",
-      "args": ["pincushion-mcp", "--project-dir", "/path/to/your/project"]
-    }
-  }
-}
-```
-
-**pnpm users:**
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "pnpm",
-      "args": ["dlx", "pincushion-mcp", "--project-dir", "/path/to/your/project"]
-    }
-  }
-}
-```
-
-**yarn users:**
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "yarn",
-      "args": ["dlx", "pincushion-mcp", "--project-dir", "/path/to/your/project"]
-    }
-  }
-}
-```
-
-**With Supabase sync:**
-
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "npx",
-      "args": [
-        "pincushion-mcp",
-        "--project-dir", "/path/to/your/project",
-        "--sync-url", "https://your-supabase.com/api",
-        "--api-key", "YOUR_API_KEY"
-      ]
-    }
-  }
-}
-```
-
-### Claude Code (CLI)
-
-Run this command to add Pincushion to Claude Code:
-
-```bash
-claude mcp add pincushion -- npx pincushion-mcp --project-dir .
-```
-
-Or with Supabase sync:
-
-```bash
-claude mcp add pincushion -- npx pincushion-mcp --project-dir . --sync-url https://your-supabase.com/api --api-key YOUR_API_KEY
-```
-
-### VS Code (Copilot / Continue)
-
-**File:** `.vscode/settings.json`
-
-```json
-{
-  "mcp.servers": {
-    "pincushion": {
-      "command": "npx",
-      "args": ["pincushion-mcp", "--project-dir", "${workspaceFolder}"]
-    }
-  }
-}
-```
-
-### Windsurf / Codeium Windsurf
-
-**File:** `~/.windsurf/mcp.json` or `~/.config/windsurf/mcp.json`
-
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "npx",
-      "args": ["pincushion-mcp", "--project-dir", "."]
-    }
-  }
-}
-```
-
-### Antigravity
-
-**File:** `~/.antigravity/mcp.json`
-
-```json
-{
-  "mcpServers": {
-    "pincushion": {
-      "command": "npx",
-      "args": ["pincushion-mcp", "--project-dir", "."]
-    }
-  }
-}
-```
-
-### OpenAI Codex / REST API Clients
-
-For tools that don't support MCP directly, use the REST API wrapper:
-
-```bash
-npx pincushion-mcp --rest --port 3456
-```
-
-This starts an HTTP server on `localhost:3456`. Endpoints:
-
-- `GET /health` — Check server status
-- `POST /call-tool` — Invoke a tool
-  - Body: `{ "toolName": "get_feedback_summary", "args": {} }`
-
-Example using curl:
-
-```bash
-curl -X POST http://localhost:3456/call-tool \
-  -H "Content-Type: application/json" \
-  -d '{"toolName": "get_feedback_summary", "args": {}}'
-```
-
----
+Use the maintained [MCP setup guide](https://pincushion.io/mcp) for exact Claude Code,
+Cursor, VS Code, and Codex commands, and the [public documentation](https://pincushion.io/docs)
+for current plan limits and troubleshooting. The optional legacy self-host connection flags below are not prerequisites for
+hosted setup.
 
 ## CLI Flags
 
@@ -247,9 +56,9 @@ npx pincushion-mcp [flags]
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--project-dir PATH` | Root directory containing `.feedback/` | Current working directory |
-| `--sync-url URL` | Supabase API endpoint for remote sync | None (local only) |
-| `--api-key KEY` | API key for Supabase authentication | None |
-| `--license-key KEY` | Pro license key (optional) | None |
+| `--sync-url URL` | Optional legacy self-host adapter endpoint; not hosted setup | None |
+| `--api-key KEY` | Optional legacy self-host adapter credential; not hosted setup | None |
+| `--license-key KEY` | Explicit account credential override; normal hosted setup uses sign-in | Signed-in account when available |
 | `--rest` | Enable REST API mode | Disabled (uses MCP/stdio) |
 | `--port PORT` | Port for REST API server | 3456 |
 
@@ -260,7 +69,7 @@ npx pincushion-mcp [flags]
 npx pincushion-mcp --project-dir /path/to/project
 ```
 
-**With Supabase sync:**
+**Optional legacy self-host adapter (not hosted Pincushion setup):**
 ```bash
 npx pincushion-mcp \
   --project-dir /path/to/project \
@@ -549,34 +358,15 @@ Each annotation file contains:
 
 ---
 
-## Supabase Sync
+## Optional legacy self-host connection
 
-To sync annotations with a remote Supabase database:
-
-1. Set up a Supabase project at [supabase.com](https://supabase.com)
-2. Create an `annotations` table with columns matching the annotation schema
-3. Generate an API key from your project settings
-4. Configure the server with `--sync-url` and `--api-key`
-
-**Example:**
-```bash
-npx pincushion-mcp \
-  --project-dir . \
-  --sync-url https://your-project.supabase.co/rest/v1 \
-  --api-key sb_project_key_abc123...
-```
-
-The server merges local `.feedback/` files with remote data, with remote taking precedence on newer updates.
-
----
-
-## Pro License
-
-Pincushion Pro includes additional features. Activate with `--license-key`:
-
-```bash
-npx pincushion-mcp --project-dir . --license-key YOUR_PRO_KEY
-```
+The `--sync-url` and `--api-key` flags select a separate legacy sync adapter.
+They are not needed to use Pincushion's hosted service. The older instructions to
+create a Supabase project and annotations table are not a supported hosted
+onboarding path; simply creating those resources does not establish a compatible
+backend. Use this adapter only with an already compatible operator-managed endpoint.
+See [hosted setup](https://pincushion.io/mcp) for the default path and
+[current pricing](https://pincushion.io/#pricing) for account plans.
 
 ---
 
@@ -584,7 +374,7 @@ npx pincushion-mcp --project-dir . --license-key YOUR_PRO_KEY
 
 ### "Module not found" error
 
-Make sure you have Node.js 18+ installed:
+Make sure you have a supported Node.js runtime: Node 22.22+ within Node 22, or Node 24:
 
 ```bash
 node --version
@@ -606,32 +396,22 @@ ls -la .feedback/
 
 If it doesn't exist, create it and add some test annotations, or the extension will create it when you pin your first feedback.
 
-### Supabase sync not working
+### Hosted feedback not appearing
 
-Verify your credentials:
+Run `npx pincushion-mcp login` if sign-in is missing or expired, then rerun setup
+in the intended repository. Confirm the acknowledged project and registered page
+URLs, restart the selected editor, and ask it to read `get_project_context` and
+`get_actionable_pins`. Preserve existing project identity; do not create a replacement
+project or backend to work around an access failure. See the
+[maintained troubleshooting guide](https://pincushion.io/mcp#quick-start).
 
-```bash
-curl -H "x-api-key: YOUR_API_KEY" \
-  https://your-project.supabase.co/rest/v1/annotations
-```
+### Agent cannot find the server
 
-### Agent can't find the server
-
-In your agent config, use the full path to `pincushion-mcp`:
-
-```bash
-which pincushion-mcp
-# Use the output path in your config
-```
-
-Or use `npx` to let it find the package:
-
-```json
-{
-  "command": "npx",
-  "args": ["pincushion-mcp", "--project-dir", "."]
-}
-```
+Rerun `npx pincushion-mcp setup` from the intended repository, preserving the
+acknowledged project identity and existing configuration. Follow the
+[maintained editor setup guide](https://pincushion.io/mcp) if setup leaves a conflicting
+configuration unchanged. Restart the selected editor and verify a real project/pin
+read. Avoid replacing a project-scoped configuration with an unscoped global entry.
 
 ---
 
