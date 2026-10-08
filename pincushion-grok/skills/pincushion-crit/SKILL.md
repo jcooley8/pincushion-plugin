@@ -45,7 +45,7 @@ same-origin registered URLs as a JSON array to an absolute local inventory file.
 For a public HTTPS page, capture the site-wide review surface:
 
 ```sh
-npm exec --yes --package=pincushion-mcp@1.11.26 -- node "/absolute/plugin/scripts/capture.mjs" --critique "https://your-confirmed-page.example/" "/absolute/output/baseline" --inventory=/absolute/output/inventory.json > "/absolute/output/baseline.json"
+npm exec --yes --package=pincushion-mcp@1.12.0 -- node "/absolute/plugin/scripts/capture.mjs" --critique "https://your-confirmed-page.example/" "/absolute/output/baseline" --inventory=/absolute/output/inventory.json > "/absolute/output/baseline.json"
 ```
 
 The capture discovers same-origin rendered links and sitemap routes, including
@@ -75,7 +75,7 @@ register a URL; stop and return to setup if this binding is absent. Standard
 capture rejects loopback. Use the package's origin-bound Crit mode instead:
 
 ```sh
-npm exec --yes --package=pincushion-mcp@1.11.26 -- node "/absolute/plugin/scripts/capture.mjs" --critique "http://127.0.0.1:3000/" "/absolute/output/baseline" --inventory=/absolute/output/inventory.json > "/absolute/output/baseline.json"
+npm exec --yes --package=pincushion-mcp@1.12.0 -- node "/absolute/plugin/scripts/capture.mjs" --critique "http://127.0.0.1:3000/" "/absolute/output/baseline" --inventory=/absolute/output/inventory.json > "/absolute/output/baseline.json"
 ```
 
 This mode allows only that explicit loopback origin, not other private network
@@ -160,7 +160,7 @@ Zero findings is valid after successful inspection; do not manufacture
 findings to produce a report.
 
 For private pages, use the existing local browser-login flow only with owner
-authorization: `npx --yes pincushion-mcp@1.11.26 snapshot --login <URL>
+authorization: `npx --yes pincushion-mcp@1.12.0 snapshot --login <URL>
 --proof-selector '<signed-in-only-selector>'`. Supply its origin-bound local
 state through PINCUSHION_STORAGE_STATE and use `--require-auth` when capturing.
 Never print, upload or commit state/cookies. Do not work around CAPTCHA, denied

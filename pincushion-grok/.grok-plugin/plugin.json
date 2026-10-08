@@ -1,6 +1,6 @@
 {
   "name": "pincushion",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Pincushion visual feedback for Grok Build: connect a project, run a brand-aware Crit, read positioned pins, and implement approved feedback.",
   "author": { "name": "Pincushion", "url": "https://pincushion.io" },
   "homepage": "https://pincushion.io",
