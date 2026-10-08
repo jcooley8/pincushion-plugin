@@ -14,7 +14,7 @@ disable-model-invocation: true
    project just to look it up. If the MCP is bound to another directory, stop
    and restart Grok from the intended repository before writing any pins.
 2. If connection is required, use the existing browser sign-in:
-   `npx --yes pincushion-mcp@1.11.26 login`. Let the user complete sign-in; never
+   `npx --yes pincushion-mcp@1.12.1 login`. Let the user complete sign-in; never
    ask for a license key, read credential files, or copy credentials into chat,
    source, plugin configuration or logs. Refresh `/mcps` afterward. An absent
    credential is a connection blocker, not an empty project.

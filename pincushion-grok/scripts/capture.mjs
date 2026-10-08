@@ -6,7 +6,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-export const MCP_VERSION = '1.11.26';
+export const MCP_VERSION = '1.12.1';
 
 export function findCaptureScript(searchPath = process.env.PATH || '') {
   for (const directory of searchPath.split(delimiter).filter(Boolean)) {
