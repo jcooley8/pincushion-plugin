@@ -507,12 +507,16 @@ async function reconcileApprovedQueue() {
   }
 }
 
+// Pushes one annotation to the hosted cloud and reports what happened instead
+// of swallowing it: callers that fire and forget keep working, and
+// fix_and_resolve can tell the agent when the cloud did not take the update.
 async function cloudSyncPush(annotation) {
   const licenseKey = resolveCloudSyncKey();
-  if (!licenseKey) return;
+  if (!licenseKey) return { ok: false, reason: 'no_license_key' };
 
+  let res;
   try {
-    await fetch(CLOUD_SYNC_URL, {
+    res = await fetch(CLOUD_SYNC_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -520,7 +524,18 @@ async function cloudSyncPush(annotation) {
       },
       body: JSON.stringify(annotation)
     });
-  } catch { /* cloud push failed — local copy is still intact */ }
+  } catch (err) {
+    // cloud push failed: the local copy is still intact
+    return { ok: false, reason: 'network_error', detail: err?.message };
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    return { ok: false, reason: 'license_rejected', status: res.status };
+  }
+  if (!res.ok) {
+    return { ok: false, reason: 'server_error', status: res.status };
+  }
+  return { ok: true };
 }
 
 // Start cloud sync polling loop.
@@ -1125,12 +1140,25 @@ async function pincushionPendingBanner() {
 
 async function toolFixAndResolve({ annotationId, fixDescription, filePath, lineNumber, commitSha, branchName, prUrl }) {
   const result = await core.toolFixAndResolve(coreConfig, { annotationId, fixDescription, filePath, lineNumber, commitSha, branchName, prUrl }, SYNC_SERVER_URL ? fetchRemoteAnnotations : null);
-  // Push implementation status to cloud
-  if (result.success) {
-    const ann = await core.findAnnotationById(coreConfig, annotationId);
-    if (ann) cloudSyncPush(ann).catch(() => {});
-  }
-  return result;
+  // Push implementation status to cloud and say whether it landed, so a
+  // rejected sign-in does not read as a resolved pin while the extension
+  // still shows it READY. Local-only mode keeps the response unchanged.
+  if (!result.success) return result;
+  const ann = await core.findAnnotationById(coreConfig, annotationId);
+  if (!ann) return result;
+  const sync = await cloudSyncPush(ann);
+  if (sync.reason === 'no_license_key') return result;
+  if (sync.ok) return { ...result, cloudSynced: true };
+  const hint = sync.reason === 'license_rejected'
+    ? "Run 'npx pincushion-mcp login' to refresh the sign-in, then resolve the pin again."
+    : undefined;
+  return {
+    ...result,
+    cloudSynced: false,
+    cloudSyncError: sync.reason,
+    ...(sync.status ? { cloudSyncStatus: sync.status } : {}),
+    ...(hint ? { cloudSyncHint: hint } : {})
+  };
 }
 
 // ─── Read-only project context (for critic subagent) ────────────────────────

@@ -59,6 +59,7 @@ npx pincushion-mcp [flags]
 | `--sync-url URL` | Optional legacy self-host adapter endpoint; not hosted setup | None |
 | `--api-key KEY` | Optional legacy self-host adapter credential; not hosted setup | None |
 | `--license-key KEY` | Explicit account credential override; normal hosted setup uses sign-in | Signed-in account when available |
+| `--cloud-sync` | Turn hosted cloud sync on explicitly; it also turns on by itself when a signed-in account or `PINCUSHION_LICENSE_KEY` is present | On when an account is found |
 | `--rest` | Enable REST API mode | Disabled (uses MCP/stdio) |
 | `--port PORT` | Port for REST API server | 3456 |
 
@@ -177,6 +178,8 @@ await mcp.callTool('add_agent_reply', {
 ### `fix_and_resolve`
 
 Combine fixing code and marking an annotation as resolved in one call. Optionally records commit / branch / PR metadata so the dashboard can backlink to what shipped.
+
+When cloud sync is on, the response also says whether the cloud took the update: `cloudSynced` is `true` or `false`, and a `false` comes with `cloudSyncError` (`license_rejected`, `server_error` or `network_error`), the HTTP `cloudSyncStatus` when there is one, and a `cloudSyncHint`. A `license_rejected` means the pin was resolved locally but the extension still shows it READY: run `npx pincushion-mcp login` and resolve it again. In local-only mode the response is unchanged.
 
 **Parameters:**
 - `annotationId` (string, required) — Annotation ID
