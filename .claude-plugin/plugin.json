@@ -1,0 +1,14 @@
+{
+  "name": "pincushion",
+  "displayName": "Pincushion",
+  "version": "1.12.4",
+  "description": "Stakeholders pin feedback on your live app; your AI agent reads the pins via MCP and fixes them.",
+  "author": {
+    "name": "Josh Cooley",
+    "url": "https://pincushion.io"
+  },
+  "homepage": "https://pincushion.io",
+  "repository": "https://github.com/jcooley8/pincushion-plugin",
+  "license": "MIT",
+  "keywords": ["feedback", "design-review", "mcp", "visual-feedback", "pins"]
+}

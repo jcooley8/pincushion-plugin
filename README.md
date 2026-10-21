@@ -47,6 +47,21 @@ Cursor, VS Code, and Codex commands, and the [public documentation](https://pinc
 for current plan limits and troubleshooting. The optional legacy self-host connection flags below are not prerequisites for
 hosted setup.
 
+## Claude Code plugin
+
+This repository is also a Claude Code plugin marketplace. In Claude Code:
+
+```
+/plugin marketplace add jcooley8/pincushion-plugin
+/plugin install pincushion@pincushion
+```
+
+The plugin starts the Pincushion MCP server for the open project
+(`npx -y pincushion-mcp --project-dir <project> --cloud-sync`) and adds
+`/pincushion:pins`, `/pincushion:my-pins`, `/pincushion:implement`,
+`/pincushion:resolve`, `/pincushion:feedback-summary` and `/pincushion:setup`.
+Run `npx pincushion-mcp login` once if the server reports local-only mode.
+
 ## CLI Flags
 
 ```bash

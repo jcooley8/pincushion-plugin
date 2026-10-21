@@ -1,0 +1,15 @@
+{
+  "name": "pincushion",
+  "description": "Pincushion plugins for Claude Code",
+  "owner": {
+    "name": "Josh Cooley",
+    "url": "https://pincushion.io"
+  },
+  "plugins": [
+    {
+      "name": "pincushion",
+      "source": "./",
+      "description": "Stakeholders pin feedback on your live app; your AI agent reads the pins via MCP and fixes them."
+    }
+  ]
+}
