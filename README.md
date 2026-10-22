@@ -62,6 +62,26 @@ The plugin starts the Pincushion MCP server for the open project
 `/pincushion:resolve`, `/pincushion:feedback-summary` and `/pincushion:setup`.
 Run `npx pincushion-mcp login` once if the server reports local-only mode.
 
+### What the plugin runs and sends
+
+- **Runs:** the `pincushion-mcp` npm package named in `.mcp.json`, which `npx`
+  downloads from npm when it isn't already cached. The plugin bundles no hooks or
+  scripts.
+- **Writes locally:** pin data and work-queue files under `.feedback/` in the open
+  project, and a random install ID in `~/.pincushion/install-id`.
+- **Pincushion cloud** (`https://dpsqzszdviltqvethxbr.supabase.co/functions/v1`,
+  only when signed in): pins, threads, pin status, screenshots and critique
+  captures, and what you pass to `fix_and_resolve` (fix description, file paths
+  and line numbers, commit SHA, branch and PR URL). The server does not upload
+  your source code.
+- **Sentry** (`ingest.us.sentry.io`): server error reports and a 20% sample of
+  performance traces. The telemetry opt-out below does not turn Sentry off.
+- **PostHog** (`us.i.posthog.com`): product events such as "pin resolved" and tool
+  errors, whose stack traces can include local file paths. Events are keyed by a
+  hashed license ID or the install ID; after `npx pincushion-mcp login`, PostHog
+  also links them to your sign-in email. No code, pin bodies or file contents.
+  Turn PostHog off with `PINCUSHION_NO_TELEMETRY=1` or `DO_NOT_TRACK=1`.
+
 ## CLI Flags
 
 ```bash
