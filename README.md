@@ -62,6 +62,20 @@ The plugin starts the Pincushion MCP server for the open project
 `/pincushion:resolve`, `/pincushion:feedback-summary` and `/pincushion:setup`.
 Run `npx pincushion-mcp login` once if the server reports local-only mode.
 
+### What the plugin runs and sends
+
+- **Runs:** the `pincushion-mcp` npm package named in `.mcp.json`, downloaded by
+  `npx` on first start. The plugin bundles no hooks or scripts.
+- **Writes locally:** pin data and work-queue files under `.feedback/` in the open
+  project, and a random install ID in `~/.pincushion/install-id`.
+- **Pincushion cloud** (`https://dpsqzszdviltqvethxbr.supabase.co/functions/v1`,
+  only when signed in): pins, threads, pin status, and the commit SHA, branch and
+  PR URL you pass to `fix_and_resolve`. Your source code is not uploaded.
+- **Sentry** (`ingest.us.sentry.io`): server error reports, so we can fix crashes.
+- **PostHog** (`us.i.posthog.com`): product events such as "pin resolved", keyed
+  by a hashed license ID or the install ID. Never code, pin bodies, URLs or file
+  contents. Turn it off with `PINCUSHION_NO_TELEMETRY=1` or `DO_NOT_TRACK=1`.
+
 ## CLI Flags
 
 ```bash
