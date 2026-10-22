@@ -57,7 +57,7 @@ This repository is also a Claude Code plugin marketplace. In Claude Code:
 ```
 
 The plugin starts the Pincushion MCP server for the open project
-(`npx -y pincushion-mcp --project-dir <project> --cloud-sync`) and adds
+(`npx -y pincushion-mcp@1.12.4 --project-dir <project> --cloud-sync`, pinned to the version this plugin was tested with) and adds
 `/pincushion:pins`, `/pincushion:my-pins`, `/pincushion:implement`,
 `/pincushion:resolve`, `/pincushion:feedback-summary` and `/pincushion:setup`.
 Run `npx pincushion-mcp login` once if the server reports local-only mode.
