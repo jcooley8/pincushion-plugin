@@ -1,0 +1,75 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "pincushion",
+  "display_name": "Pincushion",
+  "version": "1.12.5",
+  "description": "Stakeholders pin feedback on your live app; your AI coding agent reads each pin via MCP and ships the fix.",
+  "long_description": "Pincushion turns visual feedback into agent work packets. Stakeholders drop pins on your live app with the Pincushion browser extension; this MCP server exposes each pin — selector, screenshot, DOM snippet, thread, acceptance criteria — to your AI coding agent so it can read, claim, implement, and resolve feedback end to end. It reads your local project's .feedback/ directory and git; cloud sync, AI critique, and team collaboration unlock with an optional license key (free local-only mode otherwise).",
+  "author": {
+    "name": "Pincushion",
+    "url": "https://www.pincushion.io"
+  },
+  "icon": "icon.png",
+  "homepage": "https://www.pincushion.io",
+  "documentation": "https://www.pincushion.io/mcp",
+  "support": "https://www.pincushion.io/support",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jcooley8/pincushion"
+  },
+  "license": "FSL-1.1-Apache-2.0",
+  "privacy_policies": [
+    "https://www.pincushion.io/privacy"
+  ],
+  "keywords": [
+    "mcp",
+    "visual-feedback",
+    "code-review",
+    "design-feedback",
+    "qa",
+    "ai-coding-agent"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/server.js",
+        "--project-dir",
+        "${user_config.project_dir}"
+      ],
+      "env": {
+        "PINCUSHION_LICENSE_KEY": "${user_config.license_key}",
+        "PINCUSHION_REF": "claude-desktop-ext"
+      }
+    }
+  },
+  "user_config": {
+    "project_dir": {
+      "type": "directory",
+      "title": "Project directory",
+      "description": "Your project root — the repository that contains (or will contain) a .feedback/ directory. Pincushion reads pins and git history from here.",
+      "required": true
+    },
+    "license_key": {
+      "type": "string",
+      "title": "License key (optional)",
+      "description": "Your Pincushion Pro/Team license key — run `npx pincushion-mcp login` to get one. Enables cloud sync, AI critique, and team collaboration. Leave blank for free, local-only mode.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": "^22.22.0 || ^24.0.0"
+    }
+  }
+}

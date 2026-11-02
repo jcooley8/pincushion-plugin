@@ -1,0 +1,480 @@
+{
+  "version": "1.12.5",
+  "tools": [
+    {
+      "name": "add_agency_internal_message",
+      "description": "Pilot: append an owner/editor-only internal thread note to one pin. It never enters the public pin thread, report, widget, attachment system, search, or notification pipeline. Reuse the idempotency key only for an identical retry.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "add_agent_reply",
+      "description": "Add a reply to an annotation thread (e.g. to ask a clarifying question or note a finding).",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "add_bot_reply",
+      "description": "Post a Pincushion AI reply to a pin's thread. Hardcodes author=\"Pincushion AI\" and authorEmail=\"pincushion-bot@pincushion.io\" so the Chrome extension applies bot styling. ONLY call from the /pincushion-replies flow — never as a generic reply. Refuses to post if the latest thread message is already bot-authored (defense-in-depth idempotency).",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "add_member",
+      "description": "Add a collaborator to a Pincushion project. Developers consume a paid seat and can implement pins. Commenters are free and unlimited. Returns an upgrade prompt if the seat limit is reached.",
+      "pro": true,
+      "soft": false
+    },
+    {
+      "name": "approve_pin",
+      "description": "Mark a pin as approved for implementation. Only approved pins should be implemented by agents. This transitions the pin from \"open\" to \"approved\" status.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "archive_agency_label",
+      "description": "Pilot: archive one owner/editor-only agency label. Archived labels cannot be applied or used in a filtered read.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "assign_pin_to_agent",
+      "description": "Assign a pin directly to your local coding agent. Promotes the pin to \"ready\" (if not already), marks it as pending_implementation, and drops a trigger file in .feedback/.agent-queue/ that agent-loop.mjs picks up and dispatches to Cursor / Claude Code / Codex. This is the first-class \"assign to agent\" action — turns a pin into agent work in one call. Workflow: assign_pin_to_agent → (agent-loop dispatches) → fix_and_resolve.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "attach_verification_run",
+      "description": "Pilot: ask Pincushion to retrieve and validate a configured GitHub Actions run for an existing verification report. The server selects the trusted repository, workflow, checks, and artifacts. This starts no runner and cannot record client acceptance.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "capture_private_report",
+      "description": "Explicitly capture one exact registered URL in the configured existing project, without a model or AI pins, and return its private canonical app review after exact readback. Requires current owner/editor access and an installed sandboxed browser. Supply a stable UUIDv4 operationId before starting; repeating that ID only reads the recorded outcome and never repeats uploads or report minting. Does not create projects, invite members, or publish public shares.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "claim_pending_slack_install",
+      "description": "LEGACY FALLBACK. Since May 2026, Slack installs auto-link to a Pincushion license when the installer's Slack email matches, and channels are subscribed via /pincushion subscribe inside Slack — no claim token needed. This tool only applies when the installer's Slack email did NOT match an active Pincushion license at install time (the user sees a claim_token on the post-install page in that case). Pass claimToken (the on-page token, valid 7 days) + projectId to attach the webhook. Calling with no claimToken returns the new flow instructions instead of an error.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "claim_pin",
+      "description": "Claim an actionable pin before starting work on it. Transitions the pin from \"pending_implementation\" to \"implementing\" so other agents know it is being worked on. Call this before making changes, then call fix_and_resolve when done.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "complete_critique_request",
+      "description": "Mark a critique_queue request as completed after the critic subagent has run on its page URLs. Pass the request id (from get_pending_critiques) and the total pin_count produced. The server scopes the update to your license — you cannot complete another tenant's request even if you know the id.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "complete_deployment_capture_run",
+      "description": "Requests server-side frame-refresh completion after all exact page/device receipts have been recorded. The server rejects missing, stale, replayed, cross-deployment, or expired capture-run evidence and never treats a queue state as a current frame.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "configure_collaboration_integration",
+      "description": "Connect a Pincushion project to Slack, Microsoft Teams, or Discord using an incoming webhook. Low-noise defaults mirror Figma-style subscriptions: pin activity plus the deploy/verify loop, where pin_deployed/pin_verified attach as a quiet threaded reply under the pin (never a new top-level message). The louder agent-pin, email-pin, and share-report events are opt-in. For Discord, create a channel Incoming Webhook (Channel Settings → Integrations → Webhooks) and pass its URL.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "configure_project",
+      "description": "Register a Pincushion project and associate it with your app's URLs. Registration does not call a deployment provider or modify source/CI. The response includes a redacted provider-neutral manual setup handoff. An agent may set deploymentAutomation to \"auto\" only after explicit owner consent; it first detects all local candidates, requires deploymentProvider when they are ambiguous, and begins an owner-keyed lifecycle only when an admitted provider adapter and private receiver setup are available. Otherwise it stays manual and redacted. Provider read-back is not proof of a first accepted production receipt, reconciliation, fresh desktop/mobile frames, queue completion, or external Crit evidence. Use get_deployment_reconciliation_status for those independent states. **NOTE for read-only use cases:** if you only need to look up brand context, URLs, or other project metadata, call `get_project_context` instead — `configure_project` mutates project registration state.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "create_agency_label",
+      "description": "Pilot: create an owner/editor-only custom label. Labels are private agency metadata and never alter public annotation tags or appear in a public report.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "create_agent_pin",
+      "description": "File a pin as a THIRD-PARTY agent — the write half of the browser-agent → coding-agent handoff. Use when a QA/browser agent (Claude in Chrome, computer-use, a Playwright a11y/visual check, a CI checker) finds a concrete issue on a page and wants to hand it to the implementing agent as a work packet. NOT the Pincushion AI voice: the pin renders as \"<agentName> (agent)\" with an agent chip (enforced server-side; is_bot/bot styling stays reserved for the critic). Pins start \"open\" and get triaged like any pin — never pre-approved. Each pin should be one specific element + problem + suggested fix; include acceptanceCriteria when the finding has a testable definition of done. Metered as an AI action (agent_pin). Repeating the same semantic finding on the same route and selector with only query values changed returns `duplicate_variant`; inspect a distinct state, scenario, or element instead.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "create_critique_pin",
+      "description": "Create a pin authored by Pincushion AI. ONLY call this from the pincushion-critic subagent, /critique-latest-deploy, or an explicitly requested Pincushion Crit command such as Grok Build /pincushion-crit (including the confirmed first Crit during /pincushion setup) — never from an ordinary coding prompt, since the bot voice is reserved for AI-driven UI/copy/a11y and product-experience feedback (flows, empty/error states, terminology, trust). Each call should produce one tasteful, high-signal pin (max 3 per page in a critique run). The body must be concrete and actionable: name the specific element + the specific problem + the suggested fix in <40 words (up to 55 for a flow critique that must name the step before/after). Forbidden: layout philosophy, business-model commentary, roadmap ideation (a missing affordance at a specific element IS in scope), generic \"consider improving hierarchy\" advice. Always read the project's critique context (`ai.critique.effectiveContext` from get_project_context — falls back to `brandContext` when no compiled brief exists) before drafting the body so the critique is on-brand. If `ai.critique.staleness` is \"stale\" or \"missing\", suggest the user run /refresh-brand before continuing. Repeating the same semantic finding on the same route and selector with only query values changed returns `duplicate_variant`; inspect a distinct state, scenario, or element instead.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "create_invite_link",
+      "description": "Generate a Figma-style shareable invite URL for a project. The recipient opens it, enters their name + email, and joins as the specified role. Returns the share URL plus expiry. Owners can mint Editor and Commenter links; Editors can mint Commenter links only. Editor links consume a paid seat on redemption.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "create_share_report",
+      "description": "Mint a public read-only crit report link (pincushion.io/r/<token>) for a project: numbered pins with threads, screenshots, status, and the branch/PR/deploy/AI-verification trail. Anyone with the link can view it — no extension, no account, nothing to install. Free on every plan. Perfect for handing a design crit to a founder/client, or showing stakeholders what shipped. Optionally scope to a single page URL. Links never expire unless expiresInDays is set; viewers see live pin status.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "create_slack_install_link",
+      "description": "Generate an Add-to-Slack OAuth URL pre-bound to a project. Most users should prefer the public storefront URL (also returned, https://www.pincushion.io/install/slack) — since May 2026, that auto-links to a Pincushion license when the installer's Slack email matches, and channels are subscribed afterward via /pincushion subscribe inside Slack. Use this agent-flow URL only when you want the install to attach to one specific project up front.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "export_agency_evidence",
+      "description": "Pilot: produce a bounded owner/editor-only structured export for one project, filtered exactly like list_agency_pins. Includes review version and evidence provenance; it omits reviewer email, guest sessions, tokens, attachment locators, signed URLs, and provider payloads. The authenticated browser export relay can render this same authoritative projection as CSV or PDF.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "fix_and_resolve",
+      "description": "Resolve a pin after applying a code fix. Transitions the pin directly to \"resolved\" status so it disappears from the stakeholder view. No thread comment is added — the commit is the record of the fix. Pass commitSha (from `git rev-parse HEAD`), branchName (`git branch --show-current`), and prUrl (from `gh pr view --json url -q .url` if a PR was opened) so the Pincushion dashboard can link the pin to the implementing commit, branch, and PR.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "generate_critique_report",
+      "description": "Turns supplied real captures into a report receipt; it does not inspect a page or generate feedback. A web Crit requires both desktop and mobile captures for every logical screen and the exact Pincushion AI pin IDs the critic just created, each positioned in a supplied capture. Set purpose:\"capture\" only for an explicitly capture-only report.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_actionable_pins",
+      "description": "Get all pins waiting for developer attention. Returns three categories: (1) \"auto-agent\" — pins explicitly sent to the agent via \"Send to Agent\"; (2) \"follow-up\" — previously implemented pins with new user comments; (3) \"review\" — open reviewer comments that a developer has not yet picked up (the standard team collaboration queue). Use this as your starting point for both auto-agent workflows and manual review sessions.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_agency_coordination_state",
+      "description": "Pilot: read the exact owner/editor-only agency coordination state for one project. This does not enable the pilot, grant membership, or reveal internal data to commenters, public reports, widgets, search, attachments, or notifications.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_agency_internal_thread",
+      "description": "Pilot: read the append-only internal agency thread for one exact pin. This is restricted server-side to the current project owner/editor and is separate from the public pin discussion.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_annotations",
+      "description": "Retrieve annotation pins from the .feedback/ directory. Filter by page URL, LWC component name, or status. Use this to understand what feedback exists before making changes.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_component_feedback",
+      "description": "Get all feedback pins targeting a specific LWC component, with a plain-language summary ready for implementation. Returns element selectors, comments, and thread history.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_deployment_reconciliation_status",
+      "description": "Read a compact, provider-neutral deployment readiness diagnostic. It never creates a binding, rotates a credential, or calls a provider writer. Binding state, first accepted production receipt, reconciliation, fresh desktop/mobile frame state, capture run, queue, and external Crit evidence are reported independently. A claimed Vercel project ID is ownership provenance only and is never treated as a provider binding.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_feedback_summary",
+      "description": "Get a high-level rollup of all open feedback: counts by status, page, and component. Use this to plan what to address first.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_implementation_packet",
+      "description": "Get a single implementation packet for one page URL. Useful when you want to batch-fix one page at a time. Returns the same shape as a single entry in implement_approved_pins.packets — pins, aggregated selectors, suggested branch, traceability config. Matches by exact URL or partial substring.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_pending_critiques",
+      "description": "Used by /critique-latest-deploy. Lists pending critique requests queued by the deploy-hook for the current license. Newer receipts also include a deployment event, prior page outcomes, project-page inventory, and latest per-device capture receipts for truthful local reconciliation before Crit runs. Newest-first. Free on all plans (the gating happened at enqueue time on the deploy-hook side: Pro/Team — including trial-Pro — always enqueue; free licenses enqueue while their monthly AI-action pool has headroom).",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_pending_deployment_frame_refreshes",
+      "description": "Lists production deployment frame-refresh work independently of the Critique queue. Use this even when autoCritique is false. The result is redacted: it contains no deployment URL/hash, browser state, storage path, or capture proof. Start a selected run before capturing.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_pin_verification",
+      "description": "Read authoritative verification evidence for one explicit project and pin. Separates caller reports, deployment receipts, independently retrieved checks, and client acceptance. Missing evidence stays unknown.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_project_context",
+      "description": "Read-only cloud-project lookup of context (name, URLs, brand context, autoCritique flag, traceability settings). A secondary MCP process may authenticate and refresh its local cache first; this never creates or changes a cloud project. The Pincushion AI critic calls this before generating any pin, since `configure_project` would otherwise upsert the project. Pass `projectId` for an exact lookup, `name` to look up by display name, or no arguments to list all projects in this workspace.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_project_identity_diagnostic",
+      "description": "Read-only diagnostic for project identity repair. Returns only authentication state, safe key source/last-4 provenance, local project-cache state, candidate statuses, and URL/ID ambiguity. Never returns credentials or performs a network request or mutation.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_project_write_authorization",
+      "description": "Read current developer write authorization for this server's exact acknowledged project. Uses existing credentials internally, returns only projectId, authorized and a generic reason. Does not grant access, write pins, or expose credentials. A denied or unavailable result blocks critique.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_reply_candidates",
+      "description": "Used by /pincushion-replies. Returns pins where Pincushion AI should respond, with each candidate tagged by trigger reason. Two triggers: (a) \"mention\" — the latest thread message contains @pincushion AND was authored by a human; (b) \"reply-on-bot-pin\" — the pin was originally authored by Pincushion AI and the latest message is from a human. Skips resolved/archived pins and any pin where the latest message is already bot-authored (idempotency). Newest-first ordering so the slash command can pace replies.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_review_activity",
+      "description": "Pilot: read authenticated client-review decisions and completion for exact frozen review versions. It intentionally reports no speculative online/presence state and does not expose reviewers' emails or guest-session identifiers.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_selected_pins",
+      "description": "Get pins that the developer has selected for implementation from the dashboard or PINS.md checkboxes. Returns the selected pin IDs with full context (element, thread, deep link). Use this to know which pins the developer wants you to work on next.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_setup_instructions",
+      "description": "Continue an existing critique with claim, or start a project with setup and explicit editor selection. Includes authenticated project checks and exact approved-pin implementation guidance; the browser extension is optional.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "get_time_to_fix_metrics",
+      "description": "Compute median + p25/p75 time-to-fix from resolved pins. Returns sample size + threshold flag so callers can honestly hide the metric when the dataset is too small (< 5 resolved pins). This is the marketing proof point that distinguishes Pincushion from \"manage feedback\" tools — agent-native means fast.",
+      "pro": false,
+      "soft": true
+    },
+    {
+      "name": "implement_approved_pins",
+      "description": "CALL THIS FIRST when approved pins exist. Returns all stakeholder-approved pins grouped into **implementation packets** by page URL, each containing aggregated CSS selectors, full comment threads, and a suggested git branch name. One packet = one branch / one PR. Use the selectors to grep the source code, read the thread to understand what the stakeholder wants, then implement the fix. Workflow: implement_approved_pins → claim_pin → code change → fix_and_resolve. The result exposes both `packets` (canonical) and `pages` (alias).",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "import_qa_results",
+      "description": "Pilot: import already-parsed axe JSON or Playwright JSON from an authenticated owner/editor/developer. Use dryRun=true to preview normalization and exact deduplication identities without writing. Repeated imports update one project + canonical page + device + rule + target record and preserve provenance. Failed observations may create or update open agent pins; passed, skipped, and inconclusive observations never resolve pins, change pin statuses, or qualify as trusted verification. The importer never reads files, fetches URLs, calls a provider, or uploads repository contents.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "link_pin_deploy",
+      "description": "Link a deploy URL to a resolved pin. Typically called by the deploy-hook edge function once a deploy that includes the pin's fix goes live. Stakeholders see the deploy URL on the resolved pin in the dashboard. Re-runs overwrite the previous deploy URL (latest deploy wins).",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "list_agency_pins",
+      "description": "Pilot: read owner/editor-only pins with private labels and evidence summaries. `status`, `pageUrl`, `device`, and `labelIds` compose as an AND filter. The result contains no public-thread expansion, attachments, reviewer email, guest session, or presence data.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "list_collaboration_integrations",
+      "description": "List Slack and Microsoft Teams webhook subscriptions for a Pincushion project. Webhook URLs are masked.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "list_members",
+      "description": "List all members of a Pincushion project with their roles, plus seat usage info.",
+      "pro": true,
+      "soft": false
+    },
+    {
+      "name": "manage_deployment_automation",
+      "description": "Owner-keyed deployment automation management. inspect is read-only. repair is available only for a reported orphaned external provisioning attempt. rotate and revoke require confirmed: true. Results are redacted: no endpoint, credential, signing material, provider webhook IDs, or cleanup-debt IDs are returned.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "preview_collaboration_notification",
+      "description": "Preview the Slack, Teams, or Discord notification shape and recommended event routing before connecting a real webhook.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "record_deployment_page_result",
+      "description": "Record one terminal page result for a deployment frame refresh. Every non-removed page in an initialized frame refresh must upload a newly staged desktop/mobile image pair from the exact active run, then submit those newly staged desktop/mobile version IDs and hashes with captureRunId and opaque captureProof. For unchanged, the server recomputes the image-byte hashes, accepts only an exact match to the frozen canonical pair, records the new evidence as observed, and discards the private duplicate pair; use updated if either byte hash differs. The deploy hook alone freezes removed rows, so callers cannot submit removed for an initialized run. Only server-confirmed historical pre-frame not_requested receipts retain a legacy no-run route. The server finalizes only after every initialized page has the current exact capture-run pair; a Critique queue state alone is never frame-current.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "record_pin_verification",
+      "description": "Record a caller-reported verification verdict using the compatible legacy workflow. This does not independently prove deployment, check execution, or client acceptance. For pilot projects, submit_verification_report records append-only observations and attach_verification_run obtains separately validated check evidence.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "register_deployment_discovered_pages",
+      "description": "Register the exact bounded URL inventory discovered in one local browser context before staging deployment captures. The backend returns accepted pending pages; upload snapshots and record terminal results only for that returned subset, never for a locally guessed URL.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "remove_collaboration_integration",
+      "description": "Remove a Slack, Microsoft Teams, or Discord webhook subscription from a Pincushion project.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "remove_member",
+      "description": "Remove a collaborator from a Pincushion project. Frees up the seat if they were an editor.",
+      "pro": true,
+      "soft": false
+    },
+    {
+      "name": "resolve_annotation",
+      "description": "Mark an annotation as resolved after addressing the feedback. Optionally add a resolution comment explaining what was changed.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "resolve_quickstart_demo",
+      "description": "Finish the quickstart demo loop after editing the demo copy. Confirms the change, returns the bridge to real usage, and cleans up the throwaway .feedback/.quickstart/ files. Does NOT create or resolve any real pin.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "search_annotations",
+      "description": "Full-text search across all annotation comments, selectors, component names, and tags.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "set_agency_coordination_pilot",
+      "description": "Pilot: owner-only switch for the private agency coordination increment. It is off by default. Enabling it does not change prices, seats, stakeholder access, public reports, or existing pin workflows.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "set_agency_pin_labels",
+      "description": "Pilot: replace the private agency-label set on one pin. Every label must belong to the same exact project and be active; cross-project and archived labels fail closed.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "set_slack_preferences",
+      "description": "Read or update the caller's Slack DM preferences. Resolves the user via license_key → email, then applies the change across every Slack workspace the email is linked to. Call with no args to see current state. Call with `mute: \"1h\"` (or \"today\", \"forever\", \"off\") to silence DMs for a window. Call with `eventNewPin: false` (or any event_* flag) to toggle individual event types off. Same surface as the App Home toggles and `/pincushion mute`, accessible from the agent — useful for \"mute pin DMs during this refactor\" workflows.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "start_deployment_capture_run",
+      "description": "Starts one short-lived local frame-refresh run for an exact deployment and returns its opaque proof once. Keep the proof only in process and pass it to authenticated upload_page_snapshot/record_deployment_page_result/complete_deployment_capture_run calls; never put it in capture-snapshot, shell argv, a report, pin, status message, or file.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "start_quickstart_demo",
+      "description": "Start the 60-second Pincushion quickstart: returns one sample stakeholder feedback pin (element selector + thread + acceptance criteria) on a bundled demo page that is copied to .feedback/.quickstart/landing.html. Edit ONLY that copy to satisfy the pin, then call resolve_quickstart_demo. Nothing is written to the real project or synced to the cloud. Use this to show a new user the full read-pin -> fix-code -> resolve loop.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "submit_verification_report",
+      "description": "Pilot: append a project-scoped caller-reported verification observation. An idempotency key makes retries safe. Reported success is not independent check evidence or client acceptance.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "update_critique_context",
+      "description": "Lightweight write-only path for the layered critique-context system. Use this from /setup and /refresh-brand after the dev agent has gathered repo signals (README, theme tokens, sample copy, competitor URLs, recent resolved pins) and compiled them into a critique brief. Unlike `configure_project`, this does NOT create a deploy hook, sync members, or validate URLs — it just persists the compiled brief (+ signals + policy) and pushes to cloud. Identify the project by `projectId` or `name`. The compiled `critiqueContext` is what the AI critic actually reads at pin time; `critiqueSignals` + `critiquePolicy` are inputs retained for traceability and the next recompile.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "upload_page_snapshot",
+      "description": "Upload a full-page screenshot that turns the public share report into an annotated page: viewers see the real page with numbered pin markers at true positions and click-to-open thread bubbles. Capture the page yourself (kill animations, scroll to force lazy loads, full-page shot, JPEG/WebP ≤5MB), resolve each open pin's element.selector to document-pixel coordinates IN THAT CAPTURE, and pass them as pinPositions. Owner/editor only. One snapshot per (project, page) — re-upload replaces it. pageUrl must match the pins' page_url verbatim.",
+      "pro": false,
+      "soft": false
+    }
+  ],
+  "prompts": [
+    {
+      "name": "feedback-summary",
+      "description": "Project-wide feedback overview",
+      "args": []
+    },
+    {
+      "name": "implement",
+      "description": "Implement all stakeholder-approved pins — creates branches, applies fixes, resolves pins",
+      "args": []
+    },
+    {
+      "name": "invite",
+      "description": "Prepare a bounded, deduplicated bulk email invite to a public critique report",
+      "args": [
+        "emails",
+        "project_id",
+        "report_url",
+        "page_url"
+      ]
+    },
+    {
+      "name": "my-pins",
+      "description": "Show pins where you've been @mentioned",
+      "args": [
+        "username"
+      ]
+    },
+    {
+      "name": "pincushion-quickstart",
+      "description": "Watch the full Pincushion loop (read a pin → fix code → resolve) on a bundled demo page in ~60s",
+      "args": []
+    },
+    {
+      "name": "pins",
+      "description": "Show all open feedback pins grouped by page",
+      "args": []
+    },
+    {
+      "name": "resolve",
+      "description": "Claim and resolve a feedback pin",
+      "args": [
+        "pin_id"
+      ]
+    },
+    {
+      "name": "setup",
+      "description": "Register this project's URLs so the extension auto-activates",
+      "args": [
+        "urls"
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "uri": "pincushion://approved-queue",
+      "name": "Pincushion — Approved Pin Queue",
+      "description": "Pins approved by stakeholders and waiting for agent implementation. Subscribe to this resource to get notified when new pins are approved. Automatically cleared when the agent claims pins."
+    },
+    {
+      "uri": "pincushion://feedback",
+      "name": "Pincushion — Open Feedback",
+      "description": "Live view of all open feedback pins across the project. Auto-updates as pins are added, resolved, or commented on."
+    }
+  ],
+  "proTools": [
+    "add_member",
+    "list_members",
+    "remove_member"
+  ],
+  "softTools": [
+    "get_time_to_fix_metrics"
+  ]
+}

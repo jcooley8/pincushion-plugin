@@ -1,0 +1,98 @@
+# Slack App Manifest — Pincushion (Figma-style)
+#
+# Paste at https://api.slack.com/apps → your existing Pincushion app
+# → App Manifest → replace with this YAML → Save Changes → Reinstall to
+# Workspace (existing installs lose any newly-added scopes until users
+# re-OAuth).
+#
+# After the manifest update:
+#   1. Confirm Client ID / Client Secret in Basic Information match the
+#      ones already in Supabase secrets (they don't change on manifest
+#      updates).
+#   2. Hit "Reinstall to Workspace" once for your own workspace so the
+#      new `commands` scope (slash commands) lights up.
+#   3. Existing customer installs continue to work for DMs + channel
+#      posts + App Home — they just won't have /pincushion until they
+#      re-auth. Slack doesn't notify them automatically; consider DMing
+#      affected workspaces a re-install prompt at release time.
+#
+# Architectural shift (May 2026): the old manifest registered only
+# `incoming-webhook` and disabled App Home. This manifest enables the
+# bot-token flow (chat:write + DMs + Home tab) and the slash command
+# surface. The Pincushion dispatcher post-May-2026 DMs users by default
+# and uses channel subscriptions as opt-in broadcasts.
+
+display_information:
+  name: Pincushion
+  description: Visual pin feedback in your Slack DMs — new pins, @-mentions, replies, and resolves.
+  background_color: "#635BFF"
+  long_description: |
+    Pincushion lets your stakeholders drop visual pins on any web page; the bot DMs you whenever there's activity on a project you're involved in.
+
+    Default DM events (Figma-style — only people involved in a pin get DMed):
+      • New pins  • Pins ready for implementation
+      • @-mentions of you  • Replies in threads you're in
+      • Resolved pins
+
+    Tune per-event toggles, mute for an hour/day/forever, or set quiet hours in the Pincushion App Home tab.
+
+    Broadcast a project's pins to any channel by typing in that channel:
+      /pincushion subscribe <project-id-or-url>
+
+    Reply directly in any pin thread — your reply syncs back to Pincushion. Drop @pincushion in a channel to learn more.
+
+features:
+  bot_user:
+    display_name: Pincushion
+    always_online: true
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  slash_commands:
+    - command: /pincushion
+      url: https://dpsqzszdviltqvethxbr.functions.supabase.co/functions/v1/slack-events
+      description: Subscribe a channel, mute DMs, or open Pincushion help
+      usage_hint: subscribe <project> | unsubscribe <project> | list | mute 1h | help
+      should_escape: false
+
+oauth_config:
+  redirect_urls:
+    - https://dpsqzszdviltqvethxbr.functions.supabase.co/functions/v1/manage-integrations/slack/callback
+  scopes:
+    bot:
+      # Posting + receiving:
+      - incoming-webhook       # legacy fallback for webhook-only installs
+      - chat:write             # bot-token chat.postMessage to channels and DMs
+      - chat:write.public      # post to channels the bot isn't a member of (still requires join for events)
+      - im:write               # open DM channels with users via conversations.open
+      - im:history             # see thread replies in our DM with users
+      # Identity (so the dispatcher can map Slack users to Pincushion emails):
+      - users:read             # users.info to fetch display_name + profile.email
+      - users:read.email       # required for email field; some workspaces gate this separately
+      # Channel-side events (so /pincushion subscribe channels get thread reply sync):
+      - app_mentions:read      # @pincushion in a channel triggers a help reply
+      - channels:history       # message events in public channels we're a member of (thread replies)
+      - groups:history         # same for private channels
+      # Slash commands (new — requires re-install):
+      - commands               # register and receive /pincushion ...
+
+settings:
+  event_subscriptions:
+    request_url: https://dpsqzszdviltqvethxbr.functions.supabase.co/functions/v1/slack-events
+    bot_events:
+      - app_home_opened        # renders the Home view with prefs + subscriptions
+      - app_mention            # @pincushion in any channel
+      - message.channels       # thread replies in public channels (sync back to Pincushion)
+      - message.groups         # thread replies in private channels
+      - app_uninstalled        # workspace removed app -> mark revoked, pause integrations
+      - tokens_revoked         # user revoked tokens individually -> same handling
+  interactivity:
+    is_enabled: true
+    request_url: https://dpsqzszdviltqvethxbr.functions.supabase.co/functions/v1/slack-events
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
+  # Public distribution must be enabled in the Slack UI after creation:
+  # Manage Distribution → Activate Public Distribution. The manifest
+  # cannot toggle this for you.

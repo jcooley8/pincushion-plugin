@@ -1,6 +1,6 @@
 {
   "name": "pincushion",
-  "version": "0.1.0",
+  "version": "1.12.5",
   "description": "Read, implement and resolve the feedback pins your team leaves on your live app.",
   "author": {
     "name": "Pincushion",
@@ -11,7 +11,7 @@
   "license": "MIT",
   "keywords": ["pincushion", "visual-feedback", "mcp", "design-feedback", "qa"],
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
+  "mcpServers": "./.codex.mcp.json",
   "requires_local_executor": true,
   "interface": {
     "displayName": "Pincushion",
