@@ -2,10 +2,9 @@
   "mcpServers": {
     "pincushion": {
       "type": "stdio",
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "pincushion-mcp@1.12.5",
+        "${CLAUDE_PLUGIN_ROOT}/server/cli.js",
         "--cloud-sync"
       ],
       "env": {

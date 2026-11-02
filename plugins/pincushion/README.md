@@ -36,4 +36,20 @@ Start the agent from your app's repository, then run the setup skill, or run
 | `resolve` | Closes one pin |
 | `feedback-summary` | Summarizes open feedback and suggests an order |
 
-Requires Node.js 22.22 or newer for `npx pincushion-mcp`.
+Requires Node.js 22.22 or newer.
+
+## What the plugin runs
+
+For Claude Code, the plugin launches a vendored copy of the published
+`pincushion-mcp` 1.12.5 server from `server/` with
+`node ${CLAUDE_PLUGIN_ROOT}/server/cli.js --cloud-sync`. Nothing is fetched at
+launch. The server's npm dependencies are pinned in `package-lock.json`, which
+Claude Code installs when the plugin is installed. The server talks to
+`pincushion.io` (and its Supabase backend) to sync pins for the project you
+connect, reads and writes `.feedback/` in your repository, and stores your
+sign-in key in `~/.pincushion/`. The vendored source is licensed under
+`server/LICENSE.md` (FSL-1.1-Apache-2.0); the rest of the plugin is MIT.
+
+The Codex plugin keeps launching the exact pinned package
+(`npx -y pincushion-mcp@1.12.5`, see `.codex.mcp.json`). `npx -y pincushion-mcp setup`
+works independently of either plugin.

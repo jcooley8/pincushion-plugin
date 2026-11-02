@@ -1,7 +1,7 @@
 {
   "name": "pincushion",
   "displayName": "Pincushion",
-  "version": "1.12.4",
+  "version": "1.12.5",
   "description": "Stakeholders pin feedback on your live app; your AI agent reads the pins via MCP and fixes them.",
   "author": {
     "name": "Josh Cooley",

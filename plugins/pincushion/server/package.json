@@ -1,0 +1,93 @@
+{
+  "name": "pincushion-mcp",
+  "version": "1.12.5",
+  "mcpName": "io.github.jcooley8/pincushion",
+  "description": "Visual feedback as agent work packets. Stakeholders drop pins on your live app; your AI coding agent reads each pin (selector, screenshot, DOM, thread, acceptance criteria) via MCP and ships the fix.",
+  "type": "module",
+  "bin": {
+    "pincushion-mcp": "cli.js"
+  },
+  "main": "./server.js",
+  "engines": {
+    "node": "^22.22.0 || ^24.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "agent-loop": "node agent-loop.mjs",
+    "test": "npm run test:smoke && npm run test:transport",
+    "test:smoke": "node tests/mcp-smoke.mjs",
+    "test:transport": "node --experimental-vm-modules node_modules/.bin/jest --testRunner=jest-circus/runner --runInBand tests/agent-loop.test.js",
+    "test:all": "node --experimental-vm-modules node_modules/.bin/jest --testRunner=jest-circus/runner --runInBand && node --test tests/internal-accounts.test.mjs tests/realtime.contract.mjs tests/source-suggestions.test.mjs tests/submission-journal.test.mjs tests/annotation-sync.test.mjs tests/tool-registry.contract.mjs tests/claude-critique-package.test.mjs tests/setup-critique.test.mjs tests/setup-runtime.test.mjs tests/node-runtime.test.mjs tests/model-free-capture-report.test.mjs tests/server-json-repository.test.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "release:fallback": "node scripts/release-fallback.mjs",
+    "build:mcpb": "node scripts/build-mcpb.mjs",
+    "validate:mcpb": "node ../scripts/mcpb-format.mjs validate build/mcpb/manifest.json"
+  },
+  "jest": {
+    "transform": {},
+    "testPathIgnorePatterns": [
+      "/tests/deployment-frame-executor.test.mjs$",
+      "/tests/deployment-frame-runtime.test.mjs$",
+      "/tests/agency-coordination.test.mjs$",
+      "/tests/source-suggestions.test.mjs$",
+      "/tests/submission-journal.test.mjs$",
+      "/tests/qa-ingestion.test.mjs$",
+      "/tests/qa-import-core.test.mjs$",
+      "/tests/annotation-sync.test.mjs$",
+      "/tests/critique-capture.test.mjs$",
+      "/tests/claude-critique-package.test.mjs$",
+      "/tests/setup-critique.test.mjs$",
+      "/tests/setup-runtime.test.mjs$",
+      "/tests/node-runtime.test.mjs$",
+      "/tests/model-free-capture-report.test.mjs$",
+      "/tests/internal-accounts.test.mjs$",
+      "/tests/server-json-repository.test.mjs$"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/build/"
+    ]
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude-code",
+    "cursor",
+    "ai-coding-agent",
+    "visual-feedback",
+    "code-review",
+    "design-feedback",
+    "qa",
+    "pincushion",
+    "annotations",
+    "agent-work-packets"
+  ],
+  "author": {
+    "name": "Pincushion",
+    "url": "https://pincushion.io"
+  },
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcooley8/pincushion.git",
+    "directory": "pincushion-mcp"
+  },
+  "homepage": "https://pincushion.io",
+  "bugs": {
+    "url": "https://github.com/jcooley8/pincushion/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@sentry/node": "^10.74.0",
+    "jsonc-parser": "3.3.1",
+    "playwright-core": "1.52.0",
+    "posthog-node": "^5.37.0",
+    "smol-toml": "1.9.0"
+  },
+  "optionalDependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "devDependencies": {
+    "@jest/globals": "^30.3.0",
+    "jest": "^30.3.0"
+  }
+}
