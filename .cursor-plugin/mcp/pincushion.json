@@ -4,17 +4,41 @@
   "description": "Connects Cursor to your Pincushion project. Exposes tools to fetch pins, claim work, post replies, and resolve feedback.",
   "command": "npx",
   "args": ["pincushion-mcp", "--project-dir", "${workspaceFolder}"],
-  "env": {},
+  "env": {
+    "PINCUSHION_LICENSE_KEY": "your_license_key",
+    "PINCUSHION_REF": "cursor-plugin"
+  },
   "tools": [
+    "configure_project",
+    "get_project_context",
+    "update_critique_context",
     "get_actionable_pins",
     "get_feedback_summary",
     "search_annotations",
+    "get_annotations",
     "get_component_feedback",
+    "get_selected_pins",
+    "implement_approved_pins",
     "claim_pin",
+    "approve_pin",
     "add_agent_reply",
+    "add_bot_reply",
+    "get_reply_candidates",
     "resolve_annotation",
     "fix_and_resolve",
+    "create_critique_pin",
+    "get_pending_critiques",
+    "complete_critique_request",
     "add_member",
-    "list_members"
+    "list_members",
+    "remove_member",
+    "create_invite_link",
+    "get_setup_instructions",
+    "configure_collaboration_integration",
+    "list_collaboration_integrations",
+    "remove_collaboration_integration",
+    "preview_collaboration_notification",
+    "create_slack_install_link",
+    "claim_pending_slack_install"
   ]
 }

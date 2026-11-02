@@ -1,0 +1,34 @@
+{
+  "name": "pincushion",
+  "version": "0.1.0",
+  "description": "Read, implement and resolve the feedback pins your team leaves on your live app.",
+  "author": {
+    "name": "Pincushion",
+    "url": "https://www.pincushion.io"
+  },
+  "homepage": "https://www.pincushion.io/for/codex",
+  "repository": "https://github.com/jcooley8/pincushion-plugin",
+  "license": "MIT",
+  "keywords": ["pincushion", "visual-feedback", "mcp", "design-feedback", "qa"],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "requires_local_executor": true,
+  "interface": {
+    "displayName": "Pincushion",
+    "shortDescription": "Turn feedback pins on your live app into code changes",
+    "longDescription": "Teammates and clients pin feedback on your live app. Each pin carries the page URL, CSS selector, screenshot, DOM snippet, viewport and thread. This plugin connects Codex to your Pincushion project through the Pincushion MCP server so Codex can list open pins, implement the approved ones in your repository and record the commit, branch and PR on each pin.",
+    "developerName": "Pincushion",
+    "category": "Coding",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://www.pincushion.io",
+    "privacyPolicyURL": "https://www.pincushion.io/privacy",
+    "termsOfServiceURL": "https://www.pincushion.io/terms",
+    "defaultPrompt": [
+      "Show my open Pincushion pins",
+      "Implement the approved Pincushion pins"
+    ],
+    "brandColor": "#C93A28",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png"
+  }
+}

@@ -1,15 +1,17 @@
 {
   "name": "pincushion",
-  "description": "Pincushion plugins for Claude Code",
+  "description": "Pincushion plugins: read, implement and resolve feedback pins on your live app.",
   "owner": {
-    "name": "Josh Cooley",
-    "url": "https://pincushion.io"
+    "name": "Pincushion",
+    "url": "https://www.pincushion.io"
   },
   "plugins": [
     {
       "name": "pincushion",
-      "source": "./",
-      "description": "Stakeholders pin feedback on your live app; your AI agent reads the pins via MCP and fixes them."
+      "source": "./plugins/pincushion",
+      "description": "Read, implement and resolve the feedback pins your team leaves on your live app.",
+      "category": "development",
+      "homepage": "https://www.pincushion.io/for/claude-code"
     }
   ]
 }

@@ -1,0 +1,15 @@
+---
+description: First-time Pincushion setup — register the project + compile a brand-context brief grounded in the actual page sources in this repo
+alwaysApply: false
+---
+
+This is the one-time setup. After it runs, the Chrome extension auto-activates on registered URLs and the Pincushion AI critic has a real brief to work from.
+
+1. Ask the user for their project name + URLs (local dev + live/staging) + comment-access mode (open / domain / invited — last two are Pro/Team). Separately ask: “May I inspect locally detected deployment candidates and, only after you choose one and explicitly approve, begin optional deployment automation?”
+2. Call `configure_project` with those values. If local detection finds multiple candidates, ask the owner to select `deploymentProvider`; do not call a provider while it is ambiguous. Pass `deploymentAutomation: "auto"` only after explicit owner consent; otherwise omit it. Save the returned `projectId`. Provider read-back does not confirm the first accepted production receipt; unsupported APIs require the redacted manual setup handoff. Use `get_deployment_reconciliation_status` for independent receipt, reconciliation, fresh desktop/mobile frame, queue, and external Crit evidence. Do not modify source or CI without owner approval.
+3. **Compile a brand brief from the repo, not by guessing.** Detect framework (Next.js / Astro / SvelteKit / Remix / Nuxt / static HTML / Vite SPA) from `package.json` + config files. Walk the route tree (cap ~15 files) and extract headings, CTAs, body copy, and imported component names per page. Classify the project as `marketing` / `app` / `mixed`. Also read `README.md`, `BRAND.md`/`VOICE.md`/`STYLE.md` if present, plus theme tokens (`tailwind.config.*`, CSS custom properties).
+4. Ask the user only what the repo can't reveal: tone in one phrase, top 2-3 competitors, anything the critic should NOT pin on.
+5. Synthesize a compiled brief (≤8192 chars). Template flexes by project type — marketing-heavy briefs lead with voice/positioning, app-heavy briefs lead with terminology/workflow/role-aware UI.
+6. Persist with `update_critique_context({ projectId, critiqueContext, critiquePolicy, critiqueSignals: { framework, projectType, pages: [...], themeTokens, competitors, mission, audience, tone, tenantContexts: null, sources: [...] } })`.
+
+Multi-tenant SaaS note: leave `tenantContexts` null in v1. It's reserved for Salesforce-shape projects where one deployed app serves many client orgs.

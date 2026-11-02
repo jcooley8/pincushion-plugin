@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "pincushion": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "pincushion-mcp", "--cloud-sync"],
+      "env": { "PINCUSHION_REF": "agent-plugin" }
+    }
+  }
+}

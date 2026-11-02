@@ -1,0 +1,16 @@
+---
+description: Recompile the project's brand-context brief — re-walks the route tree, diffs against previous signals, carries forward user policy overrides
+alwaysApply: false
+---
+
+Use when the product evolves (new routes, rebrand, lots of pins resolved teaching new patterns) or when `get_project_context` reports `ai.critique.staleness` as `aging` (>30d) or `stale` (>60d).
+
+1. Call `get_project_context` for the project. Pull `ai.critique.signals` and `ai.critique.policy`.
+2. Re-walk the route tree using the cached `framework` + `projectType` from the previous signals. Diff against the previous `pages[]` to surface added / removed / drifted routes.
+3. Re-read theme tokens + README + BRAND/VOICE/STYLE docs. Flag any changes.
+4. Optionally fold in pin history — `get_feedback_summary` + recent resolved pin patterns — if there are ≥5 resolved pins.
+5. Ask the user only if something obviously shifted (tone, competitors, policy additions). Don't make them re-answer the same questions.
+6. Synthesize a new compiled brief. Keep the user's `critiquePolicy` verbatim unless step 5 surfaced a change.
+7. Persist with `update_critique_context`. The tool re-stamps `compiledAt` and snapshots the current resolved-pin count for the next staleness check.
+
+Report which routes changed and which sections of the brief shifted. Don't re-register URLs or recreate deploy hooks — that's `/setup`.

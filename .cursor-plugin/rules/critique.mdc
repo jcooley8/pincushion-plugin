@@ -1,0 +1,36 @@
+---
+description: Headless-first Pincushion AI critique for a complete review surface
+alwaysApply: false
+---
+
+Ask for the page URL if none was supplied. Treat the request as a one-off Crit.
+
+Before capture, read `get_project_context({ url, view: "critic" })`.
+Write its same-origin registered `urls` array to a local JSON file and
+pass it as `--inventory`; the helper also discovers links and sitemaps.
+
+1. Start headlessly with `node <pincushion-mcp>/scripts/capture-snapshot.mjs --critique <url> <outputDir> [--inventory=<registered-urls-json-file>] [--page-only] [--require-auth] [--pins=<json-or-file>]`.
+   Require bounded `mode: 'critique-v1'` JSON, status, discovery, every page,
+   desktop/mobile `imagePath`, `pinPositions`, `hotspots`, and visible semantic
+   evidence. Default discovery max 64; use `--page-only` only when explicitly
+   requested.
+2. Read existing pins with
+   `get_annotations({ projectId, pageUrls, view: "critique", critiqueRunId? })`.
+   Review every discovered screen, rank the top 8 findings across the run, and
+   keep at most 3 per screen. Use unique visible selectors, concrete fixes, and
+   no duplicates.
+3. Make one `critiqueRunId`, use it on every pin, and set `visibility` to
+   `"public"` for a public route or `"project_members"` for a signed-in app.
+   Re-read by run ID and keep the exact pin IDs.
+4. Final-capture with `--pins=<json-or-file>` after creation. By default call
+   `generate_critique_report` with `purpose: "critique"`, the matching
+   `accessMode`, `coverage`, `critiqueRunId`, exact `critiquePinIds`, and `screens`. For zero
+   good findings, use `purpose: "capture"`, label “no AI findings”, and still
+   return the review surface.
+
+Public pages are headless. Use a headed browser only for initial sign-in via
+`snapshot --login` or a flow unavailable to headless capture. Do not label
+incomplete coverage complete or publish private pixels/findings publicly.
+Preserve Pincushion’s native report and brand presentation. Shared images and
+pin records leave the machine when published; auth state does not. Keep pins
+visible, concrete, actionable, and on-brand; omit generic UX advice.

@@ -1,0 +1,15 @@
+---
+description: Implement all stakeholder-approved Pincushion pins — one at a time, claim → code → resolve → commit
+alwaysApply: false
+---
+
+1. Call `implement_approved_pins` to fetch every approved pin grouped by page, with element selectors, suggested branch names, and full thread context.
+2. For each pin:
+   - `claim_pin` to mark it implementing (so other agents don't double-claim)
+   - Use the element selector + textContent to locate the source code
+   - Read the thread to understand what the stakeholder wants
+   - Make the code change
+   - `fix_and_resolve` to close it with a one-line summary of what changed (no thread comment — the commit is the record)
+3. Commit per pin, not in batches. Suggested branch comes back in the response.
+
+If there are no approved pins, say so and offer to run `/pins` to see what's still in `ready` waiting for approval.

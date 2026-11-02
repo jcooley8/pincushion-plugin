@@ -1,0 +1,101 @@
+---
+description: Reconcile a queued deployment before running its bounded AI Crit
+alwaysApply: false
+---
+
+<!-- pincushion-deployment-reconciliation:v2 -->
+
+Call `get_pending_critiques` first. Keep a row with no `deploymentId` on the
+legacy path; never make up deployment provenance.
+
+For a deployment row, union its registered root/inventory with bounded rendered
+same-origin, robots, and nested-sitemap discovery. If provider route hints are
+absent, probe this union rather than labeling all pages changed. Reuse only local
+origin-bound auth and run:
+
+```sh
+node <pincushion-mcp>/scripts/capture-snapshot.mjs --reconcile "<root-url>" "<temporary-output-dir>" --inventory=<projectPageInventory-json-or-file> --previous-receipts=<latestCaptureReceipts-json-or-file>
+```
+
+The helper performs desktop 1280×900 plus mobile 390×844 settled captures,
+masks transient tiles, and writes a current-run pair for unchanged as well as
+added/persistent changes during a fresh frame run.
+Missing links do not remove pages; terminal 404/410 or verified out-of-scope
+redirects do. Login redirects, timeout, denied access, and invalid current
+evidence are inaccessible/failed, not unchanged. A committed legacy receipt
+without a valid v1 fingerprint is `bootstrap_required` when current
+desktop+mobile evidence is valid: stage it as `updated`. Stop on truncated discovery.
+
+Before staging or reporting, call `register_deployment_discovered_pages` with
+the exact bounded `reconciliation.discoveredPageUrls` list.
+Use only returned `acceptedPendingPages` / `acceptedPageUrls`; never upload or
+report a locally discovered URL that was not accepted pending.
+
+For each accepted pending non-removed terminal result, call `record_deployment_page_result`. First stage both newly staged desktop/mobile exact capture files with `upload_page_snapshot`,
+including `deploymentId`, returned-byte `contentHash`, and `captureFingerprint`;
+require immutable version IDs and `staged: true`. For unchanged, the server
+accepts only byte hashes exactly matching the frozen canonical pair, records
+observed evidence, and discards private duplicates; use updated when either
+hash differs. Only deploy-hook-frozen removed rows are excluded; do not submit
+removed for an initialized local run. Inaccessible/failed results remain
+truthful non-current outcomes. The backend atomically promotes staged captures
+and the canonical capture report after all terminal results.
+Retry an uncertain acknowledgement only with the exact same
+`record_deployment_page_result` body; returned `idempotent: true` is success.
+
+After a completed reconciliation receipt, Crit only changed/added pages and mint
+an independent immutable Crit receipt. Do not call `complete_critique_request`
+before reconciliation and the eligible Crit receipt are committed. The
+snapshot-latest-deploy compatibility alias uses this same checkpoint and never
+drains the queue independently.
+
+For an authenticated target, supply `PINCUSHION_STORAGE_STATE` created for the
+exact origin and pass `--require-auth`. Supplied or required auth that is
+missing, unreadable, symlinked, non-regular, insecure, malformed, unbound,
+rejected with 401/403, redirected to auth, or shown as a signed-out shell is a
+hard non-success: do not stage, upload, or record it as current. Require receipt
+`auth.mode: "authenticated"`; with no supplied/required state, public capture
+remains `auth.mode: "anonymous"`. State contents stay local.
+
+Create or refresh that local pair with `npx pincushion-mcp snapshot --login
+"<root-url>" --proof-selector '<app-specific CSS selector visible only when
+signed in>'`. The owner-only proof sidecar is bound to the exact origin and
+state bytes; its selector must be visible on every authenticated route. Missing
+or non-visible proof (including a neutral signed-out 200 shell) exits 6. The
+initial URL and every redirect are pre-checked; a private/reserved DNS/IP answer
+is rejected before navigation.
+
+## Fresh frame run
+
+Frame freshness is independent of `autoCritique`: call
+`get_pending_deployment_frame_refreshes` even when `get_pending_critiques` is
+empty. The latter controls only whether Crit is requested. Use any first
+reconciliation only to discover scope—do not upload or terminalize it. Register
+that bounded discovery with `register_deployment_discovered_pages`; then call
+`start_deployment_capture_run`. Keep its `captureProof` only in the
+authenticated MCP caller's memory—never in shell argv, a command, report, pin,
+status, or file. Re-run the fresh browser pass with only the safe run ID:
+
+```sh
+node <pincushion-mcp>/scripts/capture-snapshot.mjs --reconcile "<root-url>" "<temporary-output-dir>" --capture-run-id="$CAPTURE_RUN_ID" --require-auth
+```
+
+This is `local_authenticated_agent` evidence: a trusted-executor,
+local-agent-asserted capture context corroborated by uploaded bytes plus server
+hash/dimension validation, not cryptographic browser attestation.
+
+This fresh-run sequence supersedes any earlier legacy instruction to stop when
+the Critique queue is empty or to record `unchanged` without a run/receipts.
+Only server-confirmed historical pre-frame `not_requested` receipts retain a
+legacy no-run path; never use that omission for a listed frame-refresh item.
+
+Pass `captureRunId` and the in-memory `captureProof` only to authenticated MCP
+upload/result/complete calls, never to the browser command. For every
+non-removed initialized page, stage newly staged desktop/mobile images from the
+current run, including unchanged. Submit their IDs and server hashes; unchanged
+is accepted only when both byte hashes match the frozen canonical pair, then
+the server records observed evidence and discards the duplicate private pair.
+Use updated if either hash differs. Wait for server `frame_refresh_state: "completed"` (or use the guarded
+`complete_deployment_capture_run`) before any Crit queue completion. A queue or
+terminal reconciliation alone is never a current frame; Crit reports remain
+independent immutable post-pin artifacts.

@@ -1,0 +1,12 @@
+---
+description: Draft Pincushion AI replies on pins waiting for a response — reads the thread context and posts as the bot
+alwaysApply: false
+---
+
+Pincushion AI can reply on pin threads when stakeholders @-mention `@pincushion` or ask a follow-up question. This command drains those.
+
+1. Call `get_reply_candidates` to fetch pins that need a bot reply. Each comes with full thread context + the prompting question.
+2. For each candidate, draft a tight, on-brand reply (use `ai.critique.effectiveContext` for tone) — concrete, ≤60 words, no marketing-speak.
+3. Post via `add_bot_reply({ annotationId, body })`. Don't use `add_agent_reply` — that's for the dev's own agent voice; `add_bot_reply` is reserved for Pincushion AI bot replies.
+
+If the queue is empty, stop. Don't reply on pins that weren't surfaced as candidates.

@@ -1,8 +1,8 @@
 {
   "name": "pincushion",
   "displayName": "Pincushion Feedback",
-  "description": "View, claim, and resolve stakeholder feedback pins directly in Cursor. Installs the Pincushion MCP server and adds /pins, /my-pins, /resolve, and /feedback-summary slash commands.",
-  "version": "0.1.0",
+  "description": "View, claim, implement, and resolve stakeholder feedback pins directly in your IDE. Installs the Pincushion MCP server and adds slash commands for setup, viewing pins, brand-aware AI critique on any page (/critique), implementing approved feedback (/implement), and recompiling the project's brand brief (/refresh-brand). All AI work runs locally on your agent's tokens — no Pincushion-side LLM compute.",
+  "version": "0.2.0",
   "author": {
     "name": "Josh Cooley",
     "url": "https://pincushion.io"
@@ -14,10 +14,17 @@
   "components": {
     "mcp": ["mcp/pincushion.json"],
     "rules": [
+      "rules/setup.mdc",
       "rules/pins.mdc",
       "rules/my-pins.mdc",
       "rules/resolve.mdc",
-      "rules/feedback-summary.mdc"
+      "rules/feedback-summary.mdc",
+      "rules/critique.mdc",
+      "rules/critique-latest-deploy.mdc",
+      "rules/refresh-brand.mdc",
+      "rules/implement.mdc",
+      "rules/pincushion-replies.mdc",
+      "rules/quickstart.mdc"
     ]
   }
 }

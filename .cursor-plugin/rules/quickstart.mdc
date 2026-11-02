@@ -1,0 +1,14 @@
+---
+description: 60-second Pincushion quickstart — watch the agent read a pin, fix code, and resolve it on a bundled demo page (no extension, no real pins)
+alwaysApply: false
+---
+
+Show the user the full Pincushion loop in ~60s. Ephemeral and safe — nothing is written to the real project or the cloud.
+
+1. Call the `start_quickstart_demo` MCP tool → returns one demo pin (element selector + thread + acceptance criteria) on a page copied to `.feedback/.quickstart/landing.html`.
+2. Read the pin's thread + acceptance criteria to the user.
+3. `grep` `.feedback/.quickstart/landing.html` for the selector, then edit **only that file** to satisfy the acceptance criteria, and show the diff.
+4. Call `resolve_quickstart_demo` with the pin's `annotationId` + a one-line `fixDescription`.
+5. Relay the `nextStep` bridge from the response: confirm the project is registered (`configure_project`) and link the extension install so they can drop real pins.
+
+Rules: sandboxed demo — never create real pins, never call `fix_and_resolve`, never edit files outside `.feedback/.quickstart/`. Pass `full: true` for all three demo pins.
