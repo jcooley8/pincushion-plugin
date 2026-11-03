@@ -1,3 +1,5 @@
+<!-- 2026-11-03: documented the /critique skill next to the other plugin skills. -->
+
 # Pincushion plugin for Claude Code and Codex
 
 Teammates and clients pin feedback on your live app in
@@ -32,6 +34,7 @@ Start the agent from your app's repository, then run the setup skill, or run
 | --- | --- |
 | `setup` | Connects this repository to a Pincushion project |
 | `pins` | Lists open pins by page |
+| `critique` | Runs `/critique <url>`: a Pincushion crit that drops at most three UI, copy, or accessibility pins per screen |
 | `implement` | Implements approved pins and records each commit |
 | `resolve` | Closes one pin |
 | `feedback-summary` | Summarizes open feedback and suggests an order |

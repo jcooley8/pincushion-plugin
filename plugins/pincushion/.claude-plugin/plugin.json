@@ -2,7 +2,7 @@
   "name": "pincushion",
   "displayName": "Pincushion",
   "version": "1.12.5",
-  "description": "Read, implement and resolve the feedback pins your team leaves on your live app. Installs the Pincushion MCP server and adds skills for setup, open pins, implementing approved pins and resolving them.",
+  "description": "Read, implement and resolve the feedback pins your team leaves on your live app. Installs the Pincushion MCP server and adds skills for setup, open pins, a Pincushion crit of a URL (/critique), implementing approved pins and resolving them.",
   "author": {
     "name": "Pincushion",
     "url": "https://www.pincushion.io"
