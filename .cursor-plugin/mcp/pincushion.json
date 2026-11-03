@@ -5,7 +5,6 @@
   "command": "npx",
   "args": ["pincushion-mcp", "--project-dir", "${workspaceFolder}"],
   "env": {
-    "PINCUSHION_LICENSE_KEY": "your_license_key",
     "PINCUSHION_REF": "cursor-plugin"
   },
   "tools": [

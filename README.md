@@ -1,16 +1,18 @@
+<!-- 2026-11-03: replaced the top of the README with a one-step install and first steps for Claude Code, Cursor, VS Code, Cline, and any other MCP client. -->
+
 # Pincushion
 
 Teammates and clients pin feedback on your live app in
 [Pincushion](https://www.pincushion.io). Each pin is a work packet for your
 coding agent: page URL, CSS selector, screenshot, DOM snippet, viewport and the
-comment thread. The Pincushion MCP server (`pincushion-mcp` on npm) lets your
-agent read the pins, implement the approved ones in your repository and record
-the commit on each pin.
+comment thread. This repository is the install source for the Claude Code,
+Cursor and Codex plugins and the MCP registry metadata for `pincushion-mcp`
+(npm `1.12.5`).
 
-This repository is the install source for the Claude Code and Codex plugin
-marketplaces and the Cursor plugin.
+Requires Node.js 22.22 or newer, or Node.js 24. Do not put a license key in
+any MCP config. Sign-in writes `~/.pincushion/license-key` for you.
 
-## Install
+## Quick start
 
 ### Claude Code
 
@@ -19,41 +21,57 @@ claude plugin marketplace add jcooley8/pincushion-plugin
 claude plugin install pincushion@pincushion
 ```
 
-### Codex
+Codex uses the same marketplace: `codex plugin marketplace add jcooley8/pincushion-plugin`, then enable Pincushion from the Plugins list.
 
-```
-codex plugin marketplace add jcooley8/pincushion-plugin
-```
-
-Then enable Pincushion from the Plugins list.
+Start Claude Code in your app's repository. Run `/setup`, or run the sign-in command in [First steps](#first-steps). Then `/pins` lists open feedback and `/critique https://your-site.example` runs a Pincushion crit of that URL.
 
 ### Cursor
 
-[Add Pincushion MCP to Cursor](https://cursor.com/en/install-mcp?name=pincushion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInBpbmN1c2hpb24tbWNwIl19)
-in one click, or add the server below to `.cursor/mcp.json` in your repository.
+[Add Pincushion to Cursor](https://cursor.com/en/install-mcp?name=pincushion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInBpbmN1c2hpb24tbWNwIl19).
+
+That deeplink installs `npx -y pincushion-mcp` over stdio and does not set a license key. Restart Cursor in your app's repository, then follow [First steps](#first-steps). `/pins` and `/critique <url>` ship with the Cursor plugin in this repository.
 
 ### VS Code
 
-Install [Pincushion Feedback](https://marketplace.visualstudio.com/items?itemName=pincushion.pincushion-feedback)
-from the Visual Studio Marketplace, or add the server below with
-**MCP: Add Server** from the Command Palette.
+```
+code --install-extension pincushion.pincushion-feedback
+```
 
-### Claude Desktop, Cline, Windsurf and any other MCP client
+Or install [Pincushion Feedback](https://marketplace.visualstudio.com/items?itemName=pincushion.pincushion-feedback) from the Marketplace. Reload the window in your app's repository, then follow [First steps](#first-steps).
 
-Add this server to the client's MCP settings, with your repository's path:
+To add the server without the extension, put this in `.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "pincushion": {
+      "command": "npx",
+      "args": ["-y", "pincushion-mcp@latest"]
+    }
+  }
+}
+```
+
+### Cline
+
+Add the `pincushion` entry from [llms-install.md](llms-install.md) to `cline_mcp_settings.json`. It is `npx -y pincushion-mcp@latest` over stdio, with no API key. Pin reads work before sign-in. The same page has the sign-in command.
+
+### Any other MCP client
+
+Add this stdio server. Start the client in your app's repository so the server's working directory is that repo. If the client starts somewhere else, append `"--project-dir"` and the absolute path of the repo to `args`.
 
 ```json
 {
   "mcpServers": {
     "pincushion": {
       "command": "npx",
-      "args": ["-y", "pincushion-mcp", "--project-dir", "/path/to/your/repo"]
+      "args": ["-y", "pincushion-mcp@latest"]
     }
   }
 }
 ```
 
-## First run
+## First steps
 
 In your app's repository, run:
 
@@ -61,13 +79,11 @@ In your app's repository, run:
 npx -y pincushion-mcp setup
 ```
 
-It signs you in, links the repository to a Pincushion project and prepares the
-editor you choose. Then ask your agent: "show my open Pincushion pins".
+Setup opens a browser, signs you in, and links the repository to a Pincushion project. Restart the client, then ask: "show my open Pincushion pins."
 
-The Pincushion browser extension is optional. Pins can come from shared review
-links, Pincushion AI critiques, other agents and the REST API.
+Before that sign-in the server still starts. `get_actionable_pins`, `get_annotations` and `get_feedback_summary` read pins in this repo's `.feedback/` directory, and an empty workspace includes a sample pin that is not saved to your project. `claim_pin`, `fix_and_resolve`, cloud pins and critiques need the setup sign-in.
 
-Requires Node.js 22.22 or newer.
+The Pincushion browser extension is optional. Pins can come from shared review links, Pincushion AI critiques, other agents and the REST API.
 
 ## License
 
