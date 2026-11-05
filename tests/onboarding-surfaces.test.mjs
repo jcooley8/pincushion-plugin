@@ -61,3 +61,8 @@ test('README quick start names each client and llms-install.md is the Cline cont
   assert.equal(install.includes('PINCUSHION_LICENSE_KEY'), true);
   assert.equal(install.includes('your_license_key'), false);
 });
+
+test('Claude plugin bundles the demo page that start_quickstart_demo copies', () => {
+  const page = read('../plugins/pincushion/server/demo/landing.html');
+  assert.match(page, /id="cta-primary"/);
+});
