@@ -1,4 +1,5 @@
 // onboarding.js — first-run on-ramp for the Pincushion MCP server.
+// 2026-11-03: the agent instructions point at sign_in and confirm_project_setup.
 // 2026-10-26: the signed-out startup line names `npx -y pincushion-mcp setup`,
 // the same command as the local-only stderr hint, instead of `login`.
 //
@@ -9,12 +10,13 @@
 //
 // This module is intentionally side-effect-free except for `maybePrintOnboarding`,
 // which only writes to stderr (console.error) to match the server's existing
-// `[startup]` / `[cloud-sync]` logging style. It NEVER writes a sample pin to
+// `[startup]` / `[cloud-sync]` logging style, and `recordSecondHumanNudgeShown`,
+// which writes the caller's once-per-project marker file. It NEVER writes a sample pin to
 // Supabase or .feedback/ — an auto-written pin would pollute activation counts
 // and risk prod-data/schema. This cycle is a printed walkthrough only.
 
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { dirname, join } from 'path';
 
 // Mirror of the bot identity declared in lib/core.js. Bot-authored pins
 // (Pincushion AI critiques/replies) must NOT count as human activation — a
@@ -165,10 +167,11 @@ export function buildOnboardingBlock({ cloudSignedIn = true } = {}) {
     // printed "Running local-only", so never claim sync is on there.
     cloudSignedIn
       ? '[startup] 1. cloud-sync is on. Pins land in .feedback/ (pins.json + annotations/) and sync to your account.'
-      : '[startup] 1. Not signed in, so pins stay local in .feedback/ (pins.json + annotations/). Run `npx -y pincushion-mcp setup` in your project folder to sign in, pick a project and connect your agent.',
+      : '[startup] 1. Not signed in, so pins stay local in .feedback/ (pins.json + annotations/). Ask your agent to call the sign_in tool, or run `npx -y pincushion-mcp setup` in your project folder to sign in, pick a project and connect your agent.',
     // (2) the only real connection evidence is a successful MCP read after restart.
     '[startup] 2. Restart your editor, then ask the agent to call get_actionable_pins. Config written is not an agent-connection check.',
-    '[startup]      Review an existing AI or human finding, approve that exact pin, then have the agent implement it.',
+    '[startup]      A first project claimed from an AI crit starts with its AI findings approved and ready for the agent, except any someone else replied to.',
+    '[startup]      Any other finding still needs a person: review it, approve that exact pin, then have the agent implement it.',
     '[startup]      Need an IDE-specific manual option? Call get_setup_instructions.',
     // (3) reviewers pin from the app; nothing else needs installing.
     `[startup] 3. Teammates and clients leave pins from the Pincushion app: ${APP_URL}`,
@@ -202,26 +205,112 @@ export function buildServerInstructions() {
     '',
     'For a new user or pinless project, offer start_quickstart_demo: a ~60-second read-pin → fix-code → resolve walkthrough with no account and no project/cloud writes.',
     '',
-    'Setup: create a project in the Pincushion app (https://www.pincushion.io/app) and connect it from its Connect code tab, or run `npx pincushion-mcp setup` in the project folder to sign in, pick the project, and select an editor.',
-    'After restart, call get_actionable_pins. Config alone is not connection proof: review an existing AI or human finding, approve that exact pin, then implement it.',
+    'Setup: call sign_in, then propose_project_setup. Projects live at https://www.pincushion.io/app. Show the detected name and URLs and call confirm_project_setup once with confirmed: true. Then ask which public https page to review; once the user agrees, call start_first_crit with it and confirmed: true.',
+    'After restart, call get_actionable_pins. Config alone is not connection proof. First-crit AI findings arrive open: like any open finding, a person approves that exact pin before you implement it.',
     'For a report-originated setup, use `npx pincushion-mcp claim <report-token>`; it resumes only after authenticated project access is confirmed.',
     '',
     'For IDE-specific setup (Cursor / Claude Code / VS Code / Windsurf), call get_setup_instructions.',
   ].join('\n');
 }
 
-// Move C — the second-human / first-pin nudge (spec: exec-loop decisions
-// 2026-06-23). Fires from configured-but-zero-human-pins tool responses
-// (get_actionable_pins / get_feedback_summary): the funnel data shows installers
-// configure fine and then stall exactly here, so the response itself carries the
-// one next step. Pure string builder; the agent relays it to the developer.
+// Move C: the second-human nudge (spec: exec-loop decisions 2026-06-23, copy:
+// marketing/growth/exec-loop/move-c-nudge-copy.md). Restored 2026-11-09 after
+// Josh approved the growth plan (items C2, B3): activation is the first pin
+// from a second human, and 0 invites went out in the week before.
+//
+// It fires from get_actionable_pins / get_feedback_summary once the project
+// has a first pin (AI or human) and no pin from a second person. The agent
+// relays it once. It is a suggestion: it never blocks approving or
+// implementing a pin, and the agent must not repeat it.
 export function buildSecondHumanNudge({ projectName } = {}) {
   const name = projectName ? `"${projectName}"` : 'this project';
   return [
-    `${name} is set up but nobody's dropped a pin yet.`,
-    `If you want a second human's review, create_share_report can mint a read-only link for a teammate or stakeholder. They can add feedback later; it is not required to finish setup.`,
-    `Do not ask someone to add a new pin only to verify setup.`,
+    `${name} has its first pin, but no second person has pinned on it yet.`,
+    `Suggest once that the user send the review link to one reviewer (a teammate, PM, designer or client): create_share_report makes the link, and invite_teammate makes a free commenter invite if that person should join the project.`,
+    `This is a suggestion, not a step. If they pass, do not bring it up again, and never hold up approving or implementing a pin for it.`,
   ].join(' ');
+}
+
+// An agent-authored pin (create_agent_pin) is a tool's finding, not a person.
+function isAgentPin(pin) {
+  const authorClass = String((pin && (pin.authorClass || pin.author_class)) || '');
+  return authorClass === 'agent' || authorClass === 'pincushion_ai' ||
+    Boolean(pin && (pin.agentName || pin.agent_name));
+}
+
+function humanAuthorKey(pin) {
+  const email = String(pin.authorEmail || pin.author_email || '').trim().toLowerCase();
+  if (email) return `email:${email}`;
+  const author = String(pin.author || '').trim().toLowerCase();
+  return author ? `name:${author}` : 'unknown';
+}
+
+// Counts for the nudge gate, over open AND resolved pins in the exact project
+// scope (an untagged legacy row is never attributed to the active project):
+//   pins          every finding, AI, agent or human
+//   humanAuthors  distinct people who pinned (bots and agents excluded)
+// The local cache does not say which author is the signed-in user, so "no pin
+// from anyone else" is read as fewer than two distinct human authors.
+export function secondHumanNudgeCounts(pinsData, projectIds = null) {
+  if (!pinsData || typeof pinsData !== 'object') return { pins: 0, humanAuthors: 0 };
+  const all = [
+    ...(Array.isArray(pinsData.open) ? pinsData.open : []),
+    ...(Array.isArray(pinsData.resolved) ? pinsData.resolved : []),
+  ];
+  const filter = normalizeExactProjectIds(projectIds);
+  const authors = new Set();
+  let pins = 0;
+  for (const pin of all) {
+    if (!pin || typeof pin !== 'object') continue;
+    if (filter) {
+      const projectId = pinProjectId(pin);
+      if (!projectId || !filter.has(projectId)) continue;
+    }
+    pins += 1;
+    if (isBotPin(pin) || isAgentPin(pin)) continue;
+    authors.add(humanAuthorKey(pin));
+  }
+  return { pins, humanAuthors: authors.size };
+}
+
+// True once there is a first pin and no pin from a second person.
+export function shouldNudgeSecondHuman(pinsData, projectIds = null) {
+  const { pins, humanAuthors } = secondHumanNudgeCounts(pinsData, projectIds);
+  return pins > 0 && humanAuthors < 2;
+}
+
+// Once per project per machine, so a new editor session does not repeat the
+// suggestion. The marker is a small JSON list of project ids. Best-effort:
+// an unreadable or unwritable marker falls back to once per server process.
+export function secondHumanNudgeAlreadyShown(markerFile, projectIds) {
+  try {
+    if (!markerFile || !existsSync(markerFile)) return false;
+    const shown = JSON.parse(readFileSync(markerFile, 'utf8'));
+    if (!Array.isArray(shown)) return false;
+    const ids = [...(projectIds || [])];
+    return ids.length > 0 && ids.every((id) => shown.includes(id));
+  } catch {
+    return false;
+  }
+}
+
+export function recordSecondHumanNudgeShown(markerFile, projectIds) {
+  try {
+    if (!markerFile) return false;
+    let shown = [];
+    try {
+      const parsed = JSON.parse(readFileSync(markerFile, 'utf8'));
+      if (Array.isArray(parsed)) shown = parsed.filter((id) => typeof id === 'string');
+    } catch { /* first write, or an unreadable marker that is replaced */ }
+    for (const id of projectIds || []) {
+      if (typeof id === 'string' && id && !shown.includes(id)) shown.push(id);
+    }
+    mkdirSync(dirname(markerFile), { recursive: true });
+    writeFileSync(markerFile, JSON.stringify(shown.slice(-200)));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Build the privacy-safe property bag for the once-per-startup `mcp boot`

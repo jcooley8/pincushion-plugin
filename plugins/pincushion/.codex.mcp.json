@@ -5,7 +5,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "pincushion-mcp@1.12.5",
+        "pincushion-mcp@1.14.0",
         "--cloud-sync"
       ],
       "env": {

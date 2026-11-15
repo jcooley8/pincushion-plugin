@@ -470,9 +470,9 @@ capture-only AX). Android (adb/uiautomator) is not supported yet.
 | `add_agent_reply` |  | Add a reply to an annotation thread (e.g. to ask a clarifying question or note a finding). |
 | `add_bot_reply` |  | Post a Pincushion AI reply to a pin's thread. Hardcodes author="Pincushion AI" and… |
 | `add_member` | Pro | Add a collaborator to a Pincushion project. Developers consume a paid seat and can implement… |
-| `approve_pin` |  | Mark a pin as approved for implementation. Only approved pins should be implemented by agents.… |
+| `approve_pin` |  | Mark a pin as approved for implementation. Approval is the user's decision: show the user the… |
 | `archive_agency_label` |  | Pilot: archive one owner/editor-only agency label. Archived labels cannot be applied or used in… |
-| `assign_pin_to_agent` |  | Assign a pin directly to your local coding agent. Promotes the pin to "ready" (if not already),… |
+| `assign_pin_to_agent` |  | Assign a pin directly to your local coding agent. Assigning an open pin approves it, which is… |
 | `attach_verification_run` |  | Pilot: ask Pincushion to retrieve and validate a configured GitHub Actions run for an existing… |
 | `capture_private_report` |  | Explicitly capture one exact registered URL in the configured existing project, without a model… |
 | `claim_pending_slack_install` |  | LEGACY FALLBACK. Since May 2026, Slack installs auto-link to a Pincushion license when the… |
@@ -481,6 +481,7 @@ capture-only AX). Android (adb/uiautomator) is not supported yet.
 | `complete_deployment_capture_run` |  | Requests server-side frame-refresh completion after all exact page/device receipts have been… |
 | `configure_collaboration_integration` |  | Connect a Pincushion project to Slack, Microsoft Teams, or Discord using an incoming webhook.… |
 | `configure_project` |  | Register a Pincushion project and associate it with your app's URLs. Registration does not call… |
+| `confirm_project_setup` |  | Create or update the project after one explicit confirm. The name comes from the detected site… |
 | `create_agency_label` |  | Pilot: create an owner/editor-only custom label. Labels are private agency metadata and never… |
 | `create_agent_pin` |  | File a pin as a THIRD-PARTY agent — the write half of the browser-agent → coding-agent handoff.… |
 | `create_critique_pin` |  | Create a pin authored by Pincushion AI. ONLY call this from the pincushion-critic subagent,… |
@@ -497,6 +498,7 @@ capture-only AX). Android (adb/uiautomator) is not supported yet.
 | `get_component_feedback` |  | Get all feedback pins targeting a specific LWC component, with a plain-language summary ready… |
 | `get_deployment_reconciliation_status` |  | Read a compact, provider-neutral deployment readiness diagnostic. It never creates a binding,… |
 | `get_feedback_summary` |  | Get a high-level rollup of all open feedback: counts by status, page, and component. Use this to… |
+| `get_first_crit_status` |  | Poll the first crit. Pass the token from start_first_crit. When it is delivered and its page… |
 | `get_implementation_packet` |  | Get a single implementation packet for one page URL. Useful when you want to batch-fix one page… |
 | `get_pending_critiques` |  | Used by /critique-latest-deploy. Lists pending critique requests queued by the deploy-hook for… |
 | `get_pending_deployment_frame_refreshes` |  | Lists production deployment frame-refresh work independently of the Critique queue. Use this… |
@@ -507,16 +509,19 @@ capture-only AX). Android (adb/uiautomator) is not supported yet.
 | `get_reply_candidates` |  | Used by /pincushion-replies. Returns pins where Pincushion AI should respond, with each… |
 | `get_review_activity` |  | Pilot: read authenticated client-review decisions and completion for exact frozen review… |
 | `get_selected_pins` |  | Get pins that the developer has selected for implementation from the dashboard or PINS.md… |
-| `get_setup_instructions` |  | Continue an existing critique with claim, or start a project with setup and explicit editor… |
+| `get_setup_instructions` |  | Continue an existing critique with claim, or start a project with sign_in, one confirm, and the… |
 | `get_time_to_fix_metrics` | Pro\* | Compute median + p25/p75 time-to-fix from resolved pins. Returns sample size + threshold flag so… |
 | `implement_approved_pins` |  | CALL THIS FIRST when approved pins exist. Returns all stakeholder-approved pins grouped into… |
 | `import_qa_results` |  | Pilot: import already-parsed axe JSON or Playwright JSON from an authenticated… |
+| `invite_teammate` |  | Create one shareable invite link for a teammate. Commenter is free and the default. The result… |
 | `link_pin_deploy` |  | Link a deploy URL to a resolved pin. Typically called by the deploy-hook edge function once a… |
 | `list_agency_pins` |  | Pilot: read owner/editor-only pins with private labels and evidence summaries. `status`,… |
 | `list_collaboration_integrations` |  | List Slack and Microsoft Teams webhook subscriptions for a Pincushion project. Webhook URLs are… |
 | `list_members` | Pro | List all members of a Pincushion project with their roles, plus seat usage info. |
+| `list_setup_pins` |  | List actionable pins with likely files and links: the same read and the same default project as… |
 | `manage_deployment_automation` |  | Owner-keyed deployment automation management. inspect is read-only. repair is available only for… |
 | `preview_collaboration_notification` |  | Preview the Slack, Teams, or Discord notification shape and recommended event routing before… |
+| `propose_project_setup` |  | Detect the project once from the git remote, package.json name, dev URL, and an https homepage… |
 | `record_deployment_page_result` |  | Record one terminal page result for a deployment frame refresh. Every non-removed page in an… |
 | `record_pin_verification` |  | Record a caller-reported verification verdict using the compatible legacy workflow. This does… |
 | `register_deployment_discovered_pages` |  | Register the exact bounded URL inventory discovered in one local browser context before staging… |
@@ -528,7 +533,9 @@ capture-only AX). Android (adb/uiautomator) is not supported yet.
 | `set_agency_coordination_pilot` |  | Pilot: owner-only switch for the private agency coordination increment. It is off by default.… |
 | `set_agency_pin_labels` |  | Pilot: replace the private agency-label set on one pin. Every label must belong to the same… |
 | `set_slack_preferences` |  | Read or update the caller's Slack DM preferences. Resolves the user via license_key → email,… |
+| `sign_in` |  | Start or check browser sign-in for a stdio client. Returns a verification URL and expiry, then… |
 | `start_deployment_capture_run` |  | Starts one short-lived local frame-refresh run for an exact deployment and returns its opaque… |
+| `start_first_crit` |  | Queue a new crit on the Pincushion crit worker for one public https URL, requested for your… |
 | `start_quickstart_demo` |  | Start the 60-second Pincushion quickstart: returns one sample stakeholder feedback pin (element… |
 | `submit_verification_report` |  | Pilot: append a project-scoped caller-reported verification observation. An idempotency key… |
 | `update_critique_context` |  | Lightweight write-only path for the layered critique-context system. Use this from /setup and… |
@@ -850,13 +857,16 @@ npx pincushion-mcp --project-dir . --license-key YOUR_PRO_KEY
 
 ### "Pincushion needs Node.js 22.22+ or Node.js 24"
 
-Your `node` is older (or newer) than the supported releases. Upgrade, then rerun the command:
+Your `node` is older than the supported releases. Node.js 24 (LTS) works, and so does Node.js 22.22 or a later 22.x. Node.js 20 and older, and Node.js 22.0 to 22.21, do not. Install Node.js 24 LTS from https://nodejs.org, or use nvm, then rerun the command:
 
 ```bash
+nvm install 24 && nvm use 24
+# or, to stay on Node.js 22:
 nvm install 22 && nvm use 22
+node --version
 ```
 
-Or download Node.js from https://nodejs.org. If your editor launches the MCP server, restart it so it picks up the new Node.js.
+If your editor launches the MCP server, restart it so it picks up the new Node.js.
 
 ### "Module not found" error
 

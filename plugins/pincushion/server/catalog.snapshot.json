@@ -1,5 +1,5 @@
 {
-  "version": "1.12.5",
+  "version": "1.14.0",
   "tools": [
     {
       "name": "add_agency_internal_message",
@@ -27,7 +27,7 @@
     },
     {
       "name": "approve_pin",
-      "description": "Mark a pin as approved for implementation. Only approved pins should be implemented by agents. This transitions the pin from \"open\" to \"approved\" status.",
+      "description": "Mark a pin as approved for implementation. Approval is the user's decision: show the user the pin and call this only after the user says to fix that pin; never approve a finding the user has not seen. Only approved pins should be implemented by agents. This transitions the pin from \"open\" to \"approved\" status.",
       "pro": false,
       "soft": false
     },
@@ -39,7 +39,7 @@
     },
     {
       "name": "assign_pin_to_agent",
-      "description": "Assign a pin directly to your local coding agent. Promotes the pin to \"ready\" (if not already), marks it as pending_implementation, and drops a trigger file in .feedback/.agent-queue/ that agent-loop.mjs picks up and dispatches to Cursor / Claude Code / Codex. This is the first-class \"assign to agent\" action — turns a pin into agent work in one call. Workflow: assign_pin_to_agent → (agent-loop dispatches) → fix_and_resolve.",
+      "description": "Assign a pin directly to your local coding agent. Assigning an open pin approves it, which is the user's decision: call this only after the user has seen that pin and asked for it to be fixed. Promotes the pin to \"ready\" (if not already), marks it as pending_implementation, and drops a trigger file in .feedback/.agent-queue/ that agent-loop.mjs picks up and dispatches to Cursor / Claude Code / Codex. This is the first-class \"assign to agent\" action — turns a pin into agent work in one call. Workflow: assign_pin_to_agent → (agent-loop dispatches) → fix_and_resolve.",
       "pro": false,
       "soft": false
     },
@@ -88,6 +88,12 @@
     {
       "name": "configure_project",
       "description": "Register a Pincushion project and associate it with your app's URLs. Registration does not call a deployment provider or modify source/CI. The response includes a redacted provider-neutral manual setup handoff. An agent may set deploymentAutomation to \"auto\" only after explicit owner consent; it first detects all local candidates, requires deploymentProvider when they are ambiguous, and begins an owner-keyed lifecycle only when an admitted provider adapter and private receiver setup are available. Otherwise it stays manual and redacted. Provider read-back is not proof of a first accepted production receipt, reconciliation, fresh desktop/mobile frames, queue completion, or external Crit evidence. Use get_deployment_reconciliation_status for those independent states. **NOTE for read-only use cases:** if you only need to look up brand context, URLs, or other project metadata, call `get_project_context` instead — `configure_project` mutates project registration state.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "confirm_project_setup",
+      "description": "Create or update the project after one explicit confirm. The name comes from the detected site or repo. Requires confirmed: true and the proposalId from propose_project_setup. Pass active true to mark a new project active. Omit active and the first project on the account defaults to active. Allow does not create a project. A mismatch returns the fresh proposal instead of writing. Needs sign_in: the project counts as confirmed only after your Pincushion account accepts the registration; otherwise it returns an error with the reason (for example a plan limit) and confirms nothing. Once confirmed, it is saved for this folder and the signed-in account in .feedback/.first-crit/setup-project.json and is the default project of start_first_crit and of list_setup_pins, get_actionable_pins, implement_approved_pins, get_implementation_packet, get_annotations, get_feedback_summary and get_time_to_fix_metrics, also after a restart; if it cannot be saved the answer says so (selectionSaved: false) and it is not the default. The detected URLs the user confirmed count for start_first_crit even if an agent added them earlier. A folder already configured with --project-id or PINCUSHION_PROJECT_ID keeps that project: confirming changes nothing there, and another projectId returns folder_configured_for_other_project.",
       "pro": false,
       "soft": false
     },
@@ -188,6 +194,12 @@
       "soft": false
     },
     {
+      "name": "get_first_crit_status",
+      "description": "Poll the first crit. Pass the token from start_first_crit. When it is delivered and its page matches the one started, its AI findings are copied into the project start_first_crit named, as open findings for the user to approve, never into another one: if another account is signed in now, or this folder now uses another project, nothing is added and the message says why. start_first_crit keeps a record of each crit in this folder (10 crits, 7 days, never the license key), so polling the same token after a restart still adds the findings, or reports as a receipt that they were already added. A token with no record in this folder gets its status only. If the host was added by an agent since the start, pass hostAddedByAgentConfirmed: true only after the user agrees it belongs to the project. The message names the project and the next call.",
+      "pro": false,
+      "soft": false
+    },
+    {
       "name": "get_implementation_packet",
       "description": "Get a single implementation packet for one page URL. Useful when you want to batch-fix one page at a time. Returns the same shape as a single entry in implement_approved_pins.packets — pins, aggregated selectors, suggested branch, traceability config. Matches by exact URL or partial substring.",
       "pro": false,
@@ -249,7 +261,7 @@
     },
     {
       "name": "get_setup_instructions",
-      "description": "Continue an existing critique with claim, or start a project with setup and explicit editor selection. Includes authenticated project checks and exact approved-pin implementation guidance; the browser extension is optional.",
+      "description": "Continue an existing critique with claim, or start a project with sign_in, one confirm, and the first crit. Includes authenticated project checks and exact approved-pin implementation guidance; the browser extension is optional.",
       "pro": false,
       "soft": false
     },
@@ -268,6 +280,12 @@
     {
       "name": "import_qa_results",
       "description": "Pilot: import already-parsed axe JSON or Playwright JSON from an authenticated owner/editor/developer. Use dryRun=true to preview normalization and exact deduplication identities without writing. Repeated imports update one project + canonical page + device + rule + target record and preserve provenance. Failed observations may create or update open agent pins; passed, skipped, and inconclusive observations never resolve pins, change pin statuses, or qualify as trusted verification. The importer never reads files, fetches URLs, calls a provider, or uploads repository contents.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "invite_teammate",
+      "description": "Create one shareable invite link for a teammate. Commenter is free and the default. The result is the join URL. Editor invites use a paid seat.",
       "pro": false,
       "soft": false
     },
@@ -296,6 +314,12 @@
       "soft": false
     },
     {
+      "name": "list_setup_pins",
+      "description": "List actionable pins with likely files and links: the same read and the same default project as get_actionable_pins. Without projectId it uses the folder's default project: the one set with --project-id / PINCUSHION_PROJECT_ID, else the one confirmed with confirm_project_setup for this folder and the signed-in account, else the single project auto-discovered by URL; with none of those it reads every project. If the folder's selection file exists but cannot be read, it returns setup_selection_unreadable instead of reading. The first crit's findings land in the project start_first_crit named, as open pins. links.app opens the project in the Pincushion app, links.page and links.site open the pinned page, and links.ide opens the IDE handoff. An empty list is a finished result, not an error.",
+      "pro": false,
+      "soft": false
+    },
+    {
       "name": "manage_deployment_automation",
       "description": "Owner-keyed deployment automation management. inspect is read-only. repair is available only for a reported orphaned external provisioning attempt. rotate and revoke require confirmed: true. Results are redacted: no endpoint, credential, signing material, provider webhook IDs, or cleanup-debt IDs are returned.",
       "pro": false,
@@ -304,6 +328,12 @@
     {
       "name": "preview_collaboration_notification",
       "description": "Preview the Slack, Teams, or Discord notification shape and recommended event routing before connecting a real webhook.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "propose_project_setup",
+      "description": "Detect the project once from the git remote, package.json name, dev URL, and an https homepage when one is set. Returns a proposalId. Do not create the project until confirm_project_setup is called with confirmed: true.",
       "pro": false,
       "soft": false
     },
@@ -374,8 +404,20 @@
       "soft": false
     },
     {
+      "name": "sign_in",
+      "description": "Start or check browser sign-in for a stdio client. Returns a verification URL and expiry, then signed_in on a later call. Does not return a license key. A hosted OAuth client is already signed in and should not call this.",
+      "pro": false,
+      "soft": false
+    },
+    {
       "name": "start_deployment_capture_run",
       "description": "Starts one short-lived local frame-refresh run for an exact deployment and returns its opaque proof once. Keep the proof only in process and pass it to authenticated upload_page_snapshot/record_deployment_page_result/complete_deployment_capture_run calls; never put it in capture-snapshot, shell argv, a report, pin, status message, or file.",
+      "pro": false,
+      "soft": false
+    },
+    {
+      "name": "start_first_crit",
+      "description": "Queue a new crit on the Pincushion crit worker for one public https URL, requested for your signed-in account (call sign_in first). Needs the folder's project first: set with --project-id / PINCUSHION_PROJECT_ID, else confirmed with confirm_project_setup; without one it starts nothing and returns project_required. The crit is bound to that project and to the signed-in account, and the answer names the project its findings will go to. Show the user the exact URL and ask before calling; pass confirmed: true only after the user agrees. The page must be on a host of that project (its URLs in your account, read at every call; a host and its www. variant match). A host an agent added with configure_project does not count (host_added_by_agent) until the user agrees it belongs to the project: tell the user the agent added it, and only if they agree pass hostAddedByAgentConfirmed: true, which saves that agreement. The crit's record is kept in this folder (.feedback/.first-crit/jobs.json, 10 crits, 7 days); if it cannot be saved the answer says so (recordSaved: false) and the token can only be polled until this server restarts. A project with only localhost URLs may review a confirmed public page. It never reuses another visitor's crit of the page. A localhost URL returns localhost_not_public and is not sent. Poll get_first_crit_status with the returned token. Uses the existing Free-plan crit caps.",
       "pro": false,
       "soft": false
     },

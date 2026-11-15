@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 // server.js — Pincushion MCP Server
+// 2026-11-03: sign_in, propose_project_setup, confirm_project_setup,
+// start_first_crit, get_first_crit_status, list_setup_pins, and invite_teammate
+// replace the terminal setup wizard for agents. These tools are not metered.
 // Keyless setup reports first MCP contact so Connect can read connected without a key.
 // 2026-10-26: attaching the local-only sample pin also marks the one-shot
 // quickstart invitation as offered, so the next call is not "Run start_quickstart_demo".
@@ -26,6 +29,29 @@
 //   }
 
 import { fenceToolResult, fenceUntrustedText } from './lib/untrusted-content.js';
+import { beginAgentSignIn } from './login.mjs';
+import {
+  confirmationMatches,
+  createFirstCritSession,
+  classifyConfiguredHosts,
+  critEndpoint,
+  decorateSetupPins,
+  detectSetupProposal,
+  readProjectSiteUrls,
+  resolveSetupTarget,
+  reusableSetupProjectId,
+  siteKeysOf,
+} from './lib/one-click-setup.js';
+import {
+  createAgentHostLedger,
+  createFirstCritJobStore,
+  firstCritJobsFile,
+  persistenceReason,
+  readSetupSelection,
+  setupSelectionFile,
+  sha256,
+  writeSetupSelection,
+} from './lib/first-crit-store.js';
 import './lib/node-runtime-guard.js';
 // Capture this before any command/bootstrap await can let a hard-quit host
 // reparent the process. The later watcher must compare against the original
@@ -271,7 +297,7 @@ const { createEntrySourceReporter, resolveInstallRef } = await import('./lib/ins
 const entrySourceReporter = createEntrySourceReporter({
   log: () => console.error('[entry-source] report failed'),
 });
-const { maybePrintOnboarding, readLocalPins, countNonBotPins, countProjectFindings, buildBootEventProps, shouldAutoOpenSignin, buildServerInstructions, buildSecondHumanNudge } = await import('./lib/onboarding.js');
+const { maybePrintOnboarding, readLocalPins, countNonBotPins, countProjectFindings, buildBootEventProps, shouldAutoOpenSignin, buildServerInstructions, buildSecondHumanNudge, shouldNudgeSecondHuman, secondHumanNudgeAlreadyShown, recordSecondHumanNudgeShown } = await import('./lib/onboarding.js');
 const { buildDemoPackets, buildDemoResolvedPayload, buildQuickstartInvitation, buildLocalOnlyBanner, buildLocalOnlySample, isEmptyPinRead, DEMO_FILE_REL, QUICKSTART_DIR_REL, DEMO_COPY_NAME } = await import('./lib/quickstart.js');
 const { keySourceLabel, keyLast4, buildRejectedLicenseBanner, requireProDecision, requireQuotaDecision, usageMeterBanner } = await import('./lib/license.js');
 const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
@@ -354,7 +380,9 @@ const INSTALL_REF = resolveInstallRef({ argv: args });
 // required in MCP configs; agents get live cloud data out of the box.
 const CLOUD_SYNC_URL = process.env.PINCUSHION_SYNC_URL ||
   'https://dpsqzszdviltqvethxbr.supabase.co/functions/v1/sync-annotations';
-const SYNC_SERVER_URL = argValue('--sync-url') ||
+// `let`: a server started signed out switches to cloud reads once a sign-in
+// writes a key (enableCloudSyncAfterSignIn), as a restart would.
+let SYNC_SERVER_URL = argValue('--sync-url') ||
   ((process.env.PINCUSHION_LICENSE_KEY || LICENSE_KEY ||
     existsSync(PROJECT_LICENSE_KEY_FILE) ||
     existsSync(join(homedir(), '.pincushion', 'license-key')))
@@ -370,15 +398,81 @@ const SUPABASE_BASE = CLOUD_SYNC_URL.replace(/\/sync-annotations$/, '');
 // package.json). Tool calls filter to this set so only relevant pins are shown.
 let currentProjectIds = new Set();
 
-// Resolve the project filter: explicit projectId > --project-id default > auto-discovered > no filter
+// The license id of the account the cloud last authenticated (from the
+// authenticated project read; reset whenever that authority is dropped). Its
+// hash is the account identity of the folder selection and of the
+// agent-added host record. Never the key.
+let cloudAuthLicenseId = null;
+function currentAccountHash() {
+  return cloudAuthLicenseId ? sha256(`pincushion-license:${cloudAuthLicenseId}`) : null;
+}
+
+// The project confirm_project_setup confirmed for this folder lives in
+// .feedback/.first-crit/setup-project.json (lib/first-crit-store.js): no cap,
+// no expiry, read on every call so two servers in one folder agree, and
+// ignored when another account is signed in.
+const SETUP_SELECTION_FILE = setupSelectionFile(join(PROJECT_DIR, '.feedback'));
+
+// { state: 'none' | 'ok' | 'other_account' | 'unreadable', projectId?, file, reason? }
+function folderSelection() {
+  const read = readSetupSelection(SETUP_SELECTION_FILE);
+  if (read.state !== 'ok') return read;
+  const account = currentAccountHash();
+  // An unknown account (not authenticated yet) keeps the selection: it only
+  // ever narrows a read.
+  if (account && read.accountHash !== account) return { ...read, state: 'other_account' };
+  return read;
+}
+
+// A filter no pin matches: background readers (notifications, realtime,
+// trigger files) use it while the selection file is unreadable, so a damaged
+// file never widens what they show.
+const UNREADABLE_SELECTION_FILTER = 'pincushion-folder-selection-unreadable';
+
+// The default project of the pin reads and of the first crit, decided once:
+// explicit projectId > --project-id / PINCUSHION_PROJECT_ID > the project
+// confirmed with confirm_project_setup for this folder (and account) > the
+// single project auto-discovered by URL > no filter (1.13.0 behaviour when no
+// selection was ever made). confirm_project_setup refuses a different project
+// in a configured folder, so the configured and confirmed projects never
+// disagree. An unreadable selection file never falls through: see
+// selectionGate for the tool reads and UNREADABLE_SELECTION_FILTER above.
 // currentProjectIds is populated at startup by auto-discover via URL matching against projects.json.
-// When exactly one project is found, it's used automatically — no manual config needed.
 // Multiple matches fall through to null (safe: avoids wrong filter on overlapping URLs).
 function resolveProjectFilter(explicitId) {
   if (explicitId) return explicitId;                                    // agent passed a specific ID
   if (DEFAULT_PROJECT_ID) return DEFAULT_PROJECT_ID;                    // scoped via --project-id / env var
+  const selection = folderSelection();
+  if (selection.state === 'ok') return selection.projectId;             // confirm_project_setup
+  if (selection.state === 'unreadable') return UNREADABLE_SELECTION_FILTER;
   if (currentProjectIds.size === 1) return [...currentProjectIds][0];   // auto-discovered single project
   return null;                                                           // ambiguous or undiscovered — no filter
+}
+
+// The default project as an id, for callers that report or act on it rather
+// than filter by it: never the unreadable-selection sentinel.
+function defaultProjectId() {
+  const id = resolveProjectFilter();
+  return id === UNREADABLE_SELECTION_FILTER ? null : id;
+}
+
+// The tool reads that default to resolveProjectFilter call this first. With a
+// selection file present it authenticates, so the account check above uses
+// the signed-in account; an unreadable file answers this error instead of
+// reading anything.
+async function selectionGate(explicitId) {
+  if (explicitId || DEFAULT_PROJECT_ID) return null;
+  let selection = folderSelection();
+  if (selection.state === 'none') return null;
+  await ensureCloudAuthForTool();
+  selection = folderSelection();
+  if (selection.state !== 'unreadable') return null;
+  return {
+    success: false,
+    error: 'setup_selection_unreadable',
+    file: selection.file,
+    message: `This folder's project selection (${selection.file}) exists but cannot be read (${selection.reason}), so nothing was read. Call confirm_project_setup again to rewrite it, pass projectId to this tool, or ask the user to remove that file.`,
+  };
 }
 
 function matchesProjectFilter(projectId, filter) {
@@ -1110,6 +1204,7 @@ async function cloudProjectAuthProbeOnce() {
   const snapshot = authoritativeProjectSnapshot(data.projects, hydration.projectIds);
   cloudAuthoritativeProjectIds = snapshot.ids;
   cloudAuthoritativeProjectRoles = snapshot.roles;
+  cloudAuthLicenseId = data.licenseId;
   cloudProjectRegistryAuthoritative = true;
   cloudProjectsVerifiedAt = new Date().toISOString();
   cloudProjectAuthorityGeneration++;
@@ -1130,6 +1225,7 @@ const MAX_TOOL_PROJECT_AUTH_AGE_MS = 60_000;
 function invalidateCloudProjectAuthority() {
   cloudProjectRegistryAuthoritative = false;
   cloudAuthoritativeProjectIds = new Set();
+  cloudAuthLicenseId = null;
   cloudAuthoritativeProjectRoles = new Map();
   cloudProjectsVerifiedAt = null;
   setCloudAuthState('unknown', { source: 'none', key: null, reason: 'unknown' });
@@ -1324,10 +1420,12 @@ async function cloudSyncPullLocked({ forceBootstrap = false, assertOwned, restar
           const snapshot = authoritativeProjectSnapshot(data.projects, hydration.projectIds);
           cloudAuthoritativeProjectIds = snapshot.ids;
           cloudAuthoritativeProjectRoles = snapshot.roles;
+          cloudAuthLicenseId = typeof data.licenseId === 'string' && data.licenseId ? data.licenseId : null;
           cloudProjectsVerifiedAt = new Date().toISOString();
           cloudProjectAuthorityGeneration++;
         } else {
           cloudAuthoritativeProjectIds = new Set();
+          cloudAuthLicenseId = null;
           cloudAuthoritativeProjectRoles = new Map();
           cloudProjectsVerifiedAt = null;
         }
@@ -1336,6 +1434,7 @@ async function cloudSyncPullLocked({ forceBootstrap = false, assertOwned, restar
         if (cloudProjectAuthorityGeneration !== authorityGenerationAtFetch) return false;
         cloudProjectRegistryAuthoritative = false;
         cloudAuthoritativeProjectIds = new Set();
+        cloudAuthLicenseId = null;
         cloudAuthoritativeProjectRoles = new Map();
         cloudProjectsVerifiedAt = null;
         console.error(`[cloud-sync] Project cache hydration failed; existing cache was preserved: ${error.message}`);
@@ -1343,6 +1442,7 @@ async function cloudSyncPullLocked({ forceBootstrap = false, assertOwned, restar
     } else {
       cloudProjectRegistryAuthoritative = false;
       cloudAuthoritativeProjectIds = new Set();
+      cloudAuthLicenseId = null;
       cloudAuthoritativeProjectRoles = new Map();
       cloudProjectsVerifiedAt = null;
     }
@@ -1580,7 +1680,7 @@ if (CLOUD_SYNC || resolveCloudSyncKey()) {
   // No key and cloud sync not requested: a fresh install. Don't fail silently —
   // tell the user exactly how to turn on cloud features. (Without this, a new
   // user thinks everything works while projects/pins/share-reports never sync.)
-  console.error('[pincushion] Running local-only — not signed in. Cloud projects, pins, and share reports are off. Run `npx -y pincushion-mcp setup` in your project folder to sign in, pick a project and connect your agent.');
+  console.error('[pincushion] Running local-only — not signed in. Cloud projects, pins, and share reports are off. From your agent, call the sign_in tool; or run `npx -y pincushion-mcp setup` in your project folder to sign in, pick a project and connect your agent.');
 
   // A4 (first-5-users / install→signup leak): when a HUMAN runs this interactively
   // in a terminal — not an IDE spawning it over a stdio pipe, not CI — auto-open
@@ -1720,15 +1820,15 @@ function quickstartOfferBanner() {
   return '👋 ' + buildQuickstartInvitation() + '\n\n';
 }
 
-// Move C — second-human / first-pin nudge (spec: exec-loop decisions
-// 2026-06-23). The funnel data proved installers boot AND configure fine, then
-// stall completely at the first human pin (9 configures → 0 pins, 7d). So the
-// configured-but-zero-pins state answers read-tool calls with one additive
-// field pointing at the single next step: mint a share-report so a second
-// human drops pin #1. Additive only (never blocks or reshapes the result),
-// once per server process, silent for CI/agent-loop and activated projects.
+// Move C: second-human nudge (spec: exec-loop decisions 2026-06-23; restored
+// 2026-11-09, growth plan items C2/B3). Once the project has a first pin and no
+// pin from a second person, read-tool responses carry one additive field that
+// has the agent suggest sending the review link to one reviewer. Additive only
+// (never blocks or reshapes the result), once per project per machine, silent
+// for CI/agent-loop, before the first pin and once a second person has pinned.
 let _secondHumanNudged = false;
 let _discoveredProjectName = null;
+const SECOND_HUMAN_NUDGE_MARKER = join(homedir(), '.pincushion', 'second-human-nudged.json');
 function maybeAttachFirstPinNudge(result) {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result;
   if (_secondHumanNudged) return result;
@@ -1736,12 +1836,14 @@ function maybeAttachFirstPinNudge(result) {
   if (!currentProjectIds.size) return result; // not configured — the startup on-ramp owns that state
   try {
     const pinsData = readLocalPins(FEEDBACK_DIR);
-    if (countProjectFindings(pinsData, currentProjectIds) > 0) return result; // existing finding owns the next action
+    if (!shouldNudgeSecondHuman(pinsData, currentProjectIds)) return result; // no first pin yet, or a second person already pinned
   } catch {
     return result;
   }
   _secondHumanNudged = true;
-  result.firstPinNudge = buildSecondHumanNudge({ projectName: _discoveredProjectName });
+  if (secondHumanNudgeAlreadyShown(SECOND_HUMAN_NUDGE_MARKER, currentProjectIds)) return result;
+  recordSecondHumanNudgeShown(SECOND_HUMAN_NUDGE_MARKER, currentProjectIds);
+  result.reviewerNudge = buildSecondHumanNudge({ projectName: _discoveredProjectName });
   return result;
 }
 
@@ -2945,6 +3047,8 @@ async function readIndex() {
 // ─── Tool Implementations ─────────────────────────────────────────────────────
 
 async function toolGetAnnotations({ pageUrl, pageUrls, componentName, status, projectId, view, critiqueRunId } = {}) {
+  const blocked = await selectionGate(projectId);
+  if (blocked) return blocked;
   const result = await withAuthoritativeImplementationRead(
     () => core.toolGetAnnotations(coreConfig, { pageUrl, pageUrls, componentName, status, projectId: resolveProjectFilter(projectId), view, critiqueRunId }, SYNC_SERVER_URL ? fetchRemoteAnnotations : null),
     { totalPages: 0, pages: [] },
@@ -2961,6 +3065,8 @@ async function toolSearchAnnotations({ query }) {
 }
 
 async function toolGetFeedbackSummary({ projectId } = {}) {
+  const blocked = await selectionGate(projectId);
+  if (blocked) return blocked;
   const result = await withAuthoritativeImplementationRead(
     () => core.toolGetFeedbackSummary(coreConfig, SYNC_SERVER_URL ? fetchRemoteAnnotations : null, { projectId: resolveProjectFilter(projectId) }),
     {
@@ -3144,7 +3250,7 @@ function deploymentFrameCaptureAuth() {
 }
 
 function startAutomaticDeploymentFrameRuntime() {
-  const projectId = resolveProjectFilter();
+  const projectId = defaultProjectId();
   const auth = deploymentFrameCaptureAuth();
   const decision = deploymentFrameRuntimeStartDecision({
     optIn: process.env.PINCUSHION_AUTO_FRAME_REFRESH,
@@ -3303,7 +3409,8 @@ async function toolGetProjectIdentityDiagnostic({ projectId, urls } = {}) {
       candidates: resolution.candidates || [],
     };
   }
-  return core.buildProjectIdentityDiagnostic({
+  return {
+    ...core.buildProjectIdentityDiagnostic({
     authState: cloudAuthState,
     activeSource: cloudAuthSource,
     activeKey: cloudAuthKey,
@@ -3313,43 +3420,335 @@ async function toolGetProjectIdentityDiagnostic({ projectId, urls } = {}) {
     },
     candidates,
     ambiguity,
+    }),
+    folderSelection: describeFolderSelection(),
+  };
+}
+
+// The folder selection as get_project_identity_diagnostic reports it,
+// validated against the authenticated project list the way the configured
+// project is (cloud_absent when the account cannot see it).
+function describeFolderSelection() {
+  const selection = folderSelection();
+  const access = selection.state !== 'ok' && selection.state !== 'other_account'
+    ? null
+    : !cloudProjectRegistryAuthoritative
+      ? 'unknown'
+      : cloudAuthoritativeProjectIds.has(selection.projectId) ? 'accessible' : 'cloud_absent';
+  return {
+    file: SETUP_SELECTION_FILE,
+    state: selection.state,
+    ...(selection.projectId ? { projectId: selection.projectId } : {}),
+    ...(selection.reason ? { reason: selection.reason } : {}),
+    ...(access ? { access } : {}),
+    usedAsDefault: !DEFAULT_PROJECT_ID && selection.state === 'ok',
+  };
+}
+
+// ─── One-click setup ──────────────────────────────────────────────────────────
+
+// An editor or registry install starts this server signed out, so the sync
+// URL was null at boot and every pin read stayed on the local .feedback/
+// cache even after sign_in wrote a key. Once a key exists (and no explicit
+// --sync-url chose otherwise), switch reads to the cloud the way a restart
+// with that key would. Called before every tool.
+function enableCloudSyncAfterSignIn() {
+  if (SYNC_SERVER_URL || !resolveCloudSyncKey()) return false;
+  SYNC_SERVER_URL = CLOUD_SYNC_URL;
+  coreConfig.syncServerUrl = SYNC_SERVER_URL;
+  coreConfig.annotationCacheVersion = 2;
+  console.error('[cloud-sync] Signed in during this session: pin reads now use the cloud.');
+  return true;
+}
+
+// Where first-crit findings may land: see resolveSetupTarget, which picks the
+// same project as resolveProjectFilter minus the URL auto-discovery
+// (currentProjectIds is never passed in).
+async function readLocalProjects() {
+  try {
+    const registry = await core.readProjectRegistry({ feedbackDir: FEEDBACK_DIR });
+    return registry.malformed ? {} : (registry.projects || {});
+  } catch {
+    return {};
+  }
+}
+
+async function setupTarget() {
+  // A selection file is checked against the signed-in account.
+  if (!DEFAULT_PROJECT_ID && folderSelection().state !== 'none') await ensureCloudAuthForTool();
+  return resolveSetupTarget({
+    selection: DEFAULT_PROJECT_ID ? null : folderSelection(),
+    configuredProjectId: DEFAULT_PROJECT_ID,
+    projects: await readLocalProjects(),
   });
+}
+
+// The account's authoritative URL list for one project (see
+// readProjectSiteUrls in lib/one-click-setup.js).
+async function readAccountProjectUrls(projectId) {
+  return readProjectSiteUrls({
+    projectId,
+    syncEndpoint: cloudSyncEndpoint(),
+    licenseKey: resolveCloudSyncKey(),
+    clientHeader: `mcp/${PKG_VERSION}`,
+    localProjects: await readLocalProjects(),
+  });
+}
+
+// Hosts that agents added to projects through the configure_project tool, on
+// disk (~/.pincushion/agent-added-hosts.json; lib/first-crit-store.js). The
+// first-crit host rule does not count them until the user agrees they belong
+// to the project. confirm_project_setup and startup discovery call
+// toolConfigureProject directly and are not recorded: the user confirmed
+// those URLs, or the folder declared them.
+const agentHostLedger = createAgentHostLedger();
+
+// The configure_project tool. 2026-11-12 (pre-release source review of
+// 1.14.0): the destination is resolved after authenticating, the way core
+// picks it (the requested id, else the project of that name in the registry
+// the authenticated read just hydrated), and its URL list is read from the
+// account before anything is written. A call that would create a project
+// gets its id here, so its hosts are recorded before it exists. If the record
+// cannot be written, nothing is changed.
+async function toolConfigureProjectFromTool(args = {}) {
+  const urls = Array.isArray(args.urls) ? args.urls : [];
+  if (!siteKeysOf(urls).length) return toolConfigureProject(args);
+  await ensureCloudAuthForTool();
+  const projects = await readLocalProjects();
+  const requestedId = typeof args.projectId === 'string' && args.projectId.trim() ? args.projectId.trim() : null;
+  const existingId = requestedId
+    || Object.entries(projects).find(([, project]) => project?.name === args.name)?.[0]
+    || null;
+  const projectId = existingId || `pc_proj_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+  const baseline = existingId ? await readAccountProjectUrls(existingId) : null;
+  const { added, unverified } = classifyConfiguredHosts(urls, baseline);
+  const accountHash = currentAccountHash();
+  try {
+    if (added.length) await agentHostLedger.record(projectId, added, { reason: 'added', accountHash });
+    if (unverified.length) await agentHostLedger.record(projectId, unverified, { reason: 'unverified', accountHash });
+  } catch (error) {
+    return {
+      success: false,
+      error: 'host_record_not_saved',
+      message: `configure_project was not run and nothing was changed: the record of hosts that agents add to projects (${agentHostLedger.file}) could not be written (${persistenceReason(error)}). Fix that file or its folder, then call configure_project again.`,
+    };
+  }
+  return toolConfigureProject({ ...args, projectId });
+}
+
+const crit = critEndpoint(process.env.PINCUSHION_CRIT_URL);
+const firstCritSession = createFirstCritSession({
+  functionsBase: SUPABASE_BASE,
+  licenseKey: () => resolveCloudSyncKey(),
+  setupTarget,
+  projectUrls: readAccountProjectUrls,
+  hostLedger: agentHostLedger,
+  accountKey: async () => currentAccountHash(),
+  jobStore: createFirstCritJobStore({ file: firstCritJobsFile(FEEDBACK_DIR) }),
+  critUrl: crit.url,
+  critUrlError: crit.error || null,
+});
+
+async function toolSignIn() {
+  const result = await beginAgentSignIn();
+  if (result.status === 'signed_in') {
+    enableCloudSyncAfterSignIn();
+    return {
+      status: 'signed_in',
+      method: result.method,
+      message: 'Already signed in. Do not ask for a license key. Call propose_project_setup next.',
+    };
+  }
+  return result;
+}
+
+async function toolProposeProjectSetup() {
+  const proposal = detectSetupProposal(PROJECT_DIR);
+  return {
+    success: true,
+    ...proposal,
+    message: proposal.localhostOnly
+      ? 'This project only has a localhost URL. Confirm it once. The first crit stays local until there is a public https URL.'
+      : 'Show this name and these URLs once. Call confirm_project_setup with confirmed: true only after the user agrees.',
+    confirmWith: {
+      tool: 'confirm_project_setup',
+      confirmed: true,
+      proposalId: proposal.proposalId,
+    },
+  };
+}
+
+const CONFIRM_NEXT_PUBLIC = 'Show the user the public https URL to review and ask; only if they agree, call start_first_crit with that url and confirmed: true. Its AI findings are added to this project as open findings for the user to approve.';
+const CONFIRM_NEXT_LOCAL = 'The project is confirmed. start_first_crit refuses a localhost URL. To have a public page reviewed, show the user the exact https URL and ask; only if they agree, call start_first_crit with that url and confirmed: true. Use list_setup_pins for pins that already exist.';
+
+// What stays the default after a confirmation that did not go through.
+function defaultAfterRejection() {
+  const selection = folderSelection();
+  if (selection.state === 'ok') return `This folder's confirmed project is still ${selection.projectId}: pin reads without projectId and start_first_crit keep using it.`;
+  if (selection.state === 'unreadable') return `This folder's project selection (${selection.file}) cannot be read, so pin reads without projectId return an error until it is rewritten.`;
+  const discovered = currentProjectIds.size === 1 ? [...currentProjectIds][0] : null;
+  return discovered
+    ? `This folder still has no confirmed project, so start_first_crit has none; pin reads without projectId use the project auto-discovered by URL (${discovered}).`
+    : 'This folder still has no confirmed project, so start_first_crit has none and pin reads without projectId read every project, as before.';
+}
+
+// 2026-11-12 (pre-release source review of 1.14.0): core answers a rejected
+// registration (a 402 plan limit, a 403, a network failure) with a candidate
+// projectId and cloudSync "error ..." and no error field, and that candidate
+// became the confirmed project. Only cloudSync "synced", the cloud's
+// acknowledgement of this exact registration, confirms a project now.
+function unconfirmedRegistration(result, proposal) {
+  const base = { success: false, confirmed: false, proposalId: proposal.proposalId };
+  if (result?.error) {
+    return { ...result, ...base, error: result.error };
+  }
+  const cloudSync = typeof result?.cloudSync === 'string' ? result.cloudSync : 'no answer';
+  if (cloudSync.startsWith('skipped')) {
+    return {
+      ...base,
+      error: 'sign_in_required',
+      cloudSync,
+      message: `confirm_project_setup needs you signed in, so the project is created in your Pincushion account. Nothing was confirmed. ${defaultAfterRejection()} Call sign_in, then confirm_project_setup again.`,
+    };
+  }
+  const urls = proposal.urls.length ? proposal.urls.join(', ') : 'none';
+  return {
+    ...base,
+    error: 'registration_not_acknowledged',
+    cloudSync,
+    message: `Your Pincushion account did not accept the project registration (${cloudSync}), so nothing was confirmed. ${defaultAfterRejection()} Fix that reason and call confirm_project_setup again. To use a project you already have instead (get_project_context with no arguments lists them), first show the user that confirm_project_setup with its projectId adds the detected URLs (${urls}) to that project and renames it to "${proposal.name}", and pass that projectId only if the user agrees.`,
+  };
+}
+
+async function toolConfirmProjectSetup({ confirmed, proposalId, projectId, active } = {}) {
+  const proposal = detectSetupProposal(PROJECT_DIR);
+  const check = confirmationMatches(proposal, { confirmed, proposalId });
+  if (!check.ok) return check.error;
+  let targetId = typeof projectId === 'string' && projectId.trim() ? projectId.trim() : null;
+  // A folder configured for a project (--project-id / PINCUSHION_PROJECT_ID)
+  // keeps it: confirming here never creates or switches to another project,
+  // so the pin reads and the first crit keep one project.
+  if (DEFAULT_PROJECT_ID) {
+    if (targetId && targetId !== DEFAULT_PROJECT_ID) {
+      return {
+        success: false,
+        error: 'folder_configured_for_other_project',
+        configuredProjectId: DEFAULT_PROJECT_ID,
+        proposalId: proposal.proposalId,
+        message: `This folder is configured for project ${DEFAULT_PROJECT_ID} (--project-id or PINCUSHION_PROJECT_ID in its MCP config), so project ${targetId} was not confirmed and nothing was changed. Pin reads and the first crit use ${DEFAULT_PROJECT_ID}. To use another project in this folder, run npx pincushion-mcp setup there to change its config, then restart the MCP server.`,
+      };
+    }
+    return {
+      success: true,
+      projectId: DEFAULT_PROJECT_ID,
+      alreadyConfigured: true,
+      proposalId: proposal.proposalId,
+      localhostOnly: proposal.localhostOnly,
+      message: `This folder is already configured for project ${DEFAULT_PROJECT_ID} (--project-id or PINCUSHION_PROJECT_ID), so nothing was created or changed and the detected URLs were not added. Pin reads and the first crit use this project. The first crit reviews a page on the project's hosts in your account; if the page is not on one, ask the user to add its URL in the Pincushion app (https://www.pincushion.io/app).`,
+      next: proposal.localhostOnly ? CONFIRM_NEXT_LOCAL : CONFIRM_NEXT_PUBLIC,
+    };
+  }
+  if (!targetId) {
+    const registry = await core.readProjectRegistry({ feedbackDir: FEEDBACK_DIR });
+    if (!registry.malformed) targetId = reusableSetupProjectId(registry.projects, proposal.name);
+  }
+  const result = await toolConfigureProject({
+    name: proposal.name,
+    urls: proposal.urls,
+    ...(targetId ? { projectId: targetId } : {}),
+    ...(typeof active === 'boolean' ? { planActive: active } : {}),
+  });
+  if (result?.error || result?.cloudSync !== 'synced' || typeof result?.projectId !== 'string' || !result.projectId) {
+    return unconfirmedRegistration(result, proposal);
+  }
+  const accountHash = currentAccountHash();
+  // The user saw these URLs: they count for the first crit even if an agent's
+  // configure_project call added them before.
+  let trustFailure = null;
+  try {
+    await agentHostLedger.acknowledge(result.projectId, siteKeysOf(proposal.urls), { accountHash, via: 'confirm_project_setup' });
+  } catch (error) {
+    trustFailure = persistenceReason(error);
+  }
+  let selectionFailure = null;
+  try {
+    await writeSetupSelection(SETUP_SELECTION_FILE, { projectId: result.projectId, accountHash });
+  } catch (error) {
+    selectionFailure = persistenceReason(error);
+  }
+  const notes = [];
+  if (selectionFailure) {
+    notes.push(`The project was registered in your account, but this folder's selection could not be saved at ${SETUP_SELECTION_FILE} (${selectionFailure}), so it is not this folder's default project: pin reads without projectId and start_first_crit do not use it. Fix that folder's permissions and call confirm_project_setup again.`);
+  }
+  if (trustFailure) {
+    notes.push(`The detected URLs could not be recorded as confirmed by the user (${agentHostLedger.file}: ${trustFailure}), so any of them an agent added earlier with configure_project still needs hostAddedByAgentConfirmed for the first crit.`);
+  }
+  return {
+    ...result,
+    confirmed: !selectionFailure,
+    selectionSaved: !selectionFailure,
+    proposalId: proposal.proposalId,
+    localhostOnly: proposal.localhostOnly,
+    ...(notes.length ? { warning: notes.join(' ') } : {}),
+    next: selectionFailure ? notes[0] : (proposal.localhostOnly ? CONFIRM_NEXT_LOCAL : CONFIRM_NEXT_PUBLIC),
+  };
+}
+
+async function toolStartFirstCrit({ url, confirmed, hostAddedByAgentConfirmed } = {}) {
+  return firstCritSession.start(url, { confirmed, hostAddedByAgentConfirmed });
+}
+
+async function toolGetFirstCritStatus({ token, jobId, hostAddedByAgentConfirmed } = {}) {
+  return firstCritSession.status(token || jobId, { hostAddedByAgentConfirmed });
+}
+
+// The same read, and the same default project (resolveProjectFilter), as
+// get_actionable_pins: the first crit's findings land in that project as open
+// pins, and their approval state lives on the pins.
+async function toolListSetupPins(args = {}) {
+  const projectId = (typeof args.projectId === 'string' && args.projectId.trim()) || undefined;
+  const result = await toolGetActionablePins({ projectId, mode: args.mode });
+  if (result?.error) return result;
+  return decorateSetupPins(result);
+}
+
+async function toolInviteTeammate({ projectId, role = 'commenter', expiresInDays = 30, maxUses = 0 } = {}) {
+  return toolCreateInviteLink({ projectId, role, expiresInDays, maxUses });
 }
 
 // ─── NEW: Get Setup Instructions ──────────────────────────────────────────────
 
 async function toolGetSetupInstructions() {
-  const activeProjectId = resolveProjectFilter() || 'YOUR_PROJECT_ID';
+  const activeProjectId = defaultProjectId() || 'YOUR_PROJECT_ID';
   return {
     title: 'Pincushion — continue your feedback into a fix',
     description: 'Connect visual feedback pins to your AI coding agent',
     try_it_first: 'Have a critique report? Keep its findings open and use claim with that report token. The optional quickstart demo is for projects without existing findings.',
     quick_start: {
-      step1: 'Create a project in the Pincushion app (https://www.pincushion.io/app) and connect it from its Connect code tab (GitHub or the setup command), or run npx pincushion-mcp setup in the project folder. From a critique report: npx pincushion-mcp claim <report-token>.',
-      step2: 'Restart the editor if needed, confirm authenticated access to this project, explicitly approve one finding, then ask the agent to read and implement that exact pin. Configuration alone is not activation.'
+      step1: 'Call sign_in, then propose_project_setup. Show the detected name and URLs and call confirm_project_setup once with confirmed: true. Then show the user the public https page to review and, once they agree, call start_first_crit with that url and confirmed: true, and poll get_first_crit_status.',
+      step2: 'Call list_setup_pins. Each pin includes likely files plus app, page, and IDE links. invite_teammate returns one shareable link. From an existing critique report: npx pincushion-mcp claim <report-token>.'
     },
     optional_extension: 'https://www.pincushion.io/install/chrome — optional for placing new feedback on other pages',
     milestones: ['configuration_written', 'authenticated_project_access', 'explicit_approval', 'exact_pin_mcp_read', 'implementation_recorded', 'deployed', 'verified'],
     one_click_install: {
+      hosted: {
+        url: 'https://www.pincushion.io/api/mcp',
+        description: 'Default for Cursor, Claude Code, VS Code, and Cline. Add this URL and sign in in the browser. Do not put a license key in the URL. Use stdio only for a localhost target.'
+      },
       cursor: {
+        url: 'https://www.pincushion.io/api/mcp',
         button_url: 'https://www.pincushion.io/install/cursor',
-        deeplink: 'cursor://anysphere.cursor-deeplink/mcp/install?name=pincushion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyJwaW5jdXNoaW9uLW1jcCIsIi0tcHJvamVjdC1kaXIiLCIuIiwiLS1jbG91ZC1zeW5jIl19',
-        description: 'Click "Add to Cursor" on pincushion.io, or paste the deeplink in your browser'
+        description: 'Add the hosted URL. The editor opens a browser to sign in.'
       },
       claude_code: {
-        command: 'claude mcp add pincushion -- npx pincushion-mcp --project-dir . --cloud-sync',
-        description: 'Run this in your project directory'
+        url: 'https://www.pincushion.io/api/mcp',
+        description: 'The Claude Code plugin already provides this URL. Do not add a second Pincushion server.'
       },
       vs_code: {
+        url: 'https://www.pincushion.io/api/mcp',
         file: '.vscode/mcp.json',
-        content: {
-          servers: {
-            pincushion: {
-              command: 'npx',
-              args: ['pincushion-mcp', '--project-dir', '${workspaceFolder}', '--cloud-sync']
-            }
-          }
-        }
+        content: { servers: { pincushion: { type: 'http', url: 'https://www.pincushion.io/api/mcp' } } },
+        description: 'Add this HTTP server to .vscode/mcp.json and sign in in the browser. Use stdio only for a localhost target.'
       },
       codex: {
         command: 'codex mcp add pincushion -- npx -y pincushion-mcp --project-dir . --cloud-sync',
@@ -3377,8 +3776,8 @@ async function toolGetSetupInstructions() {
     },
     cloud_sync: {
       description: 'Cloud sync is enabled by default with --cloud-sync flag. Reviewers can drop pins on deployed/staging sites anytime — even when your IDE is closed. Pins sync to your local .feedback/ when your MCP server next starts.',
-      setup: 'Use claim for an existing report or setup for a new project. Run `npx pincushion-mcp login` to recover missing or expired authentication; preserve the project and report context.',
-      free_tier: '1 project, unlimited pins, no usage caps, 30s sync interval',
+      setup: 'Call sign_in. It opens a browser and does not return a license key. Use claim for an existing report.',
+      free_tier: '1 active project, unlimited projects, unlimited pins, 25 AI actions a month, 30s sync interval',
       pro_tier: 'Unlimited projects and pins, 90-day retention, 10s sync interval'
     },
     no_extension_fallback: {
@@ -3436,7 +3835,7 @@ async function toolResolveQuickstartDemo({ annotationId, fixDescription } = {}) 
     fixDescription,
     diff: changeDetected ? 'Demo file edited ✓' : '',
     storeUrl: 'https://www.pincushion.io/install/chrome',
-    projectId: resolveProjectFilter() || null,
+    projectId: defaultProjectId() || null,
     localOnly: !SYNC_SERVER_URL,
   });
   if (!changeDetected) {
@@ -3497,6 +3896,7 @@ async function toolConfigureProject({
   brandContext, autoCritique,
   critiqueSignals, critiquePolicy, critiqueContext,
   deploymentAutomation, deploymentProvider,
+  planActive,
 } = {}) {
   await ensureCloudAuthForTool();
   const credentialCandidates = cloudKeyCandidates();
@@ -3531,6 +3931,7 @@ async function toolConfigureProject({
     brandContext, autoCritique,
     critiqueSignals, critiquePolicy, critiqueContext,
     deploymentAutomation, deploymentProvider,
+    ...(typeof planActive === 'boolean' ? { planActive } : {}),
   });
   if (result.projectId) {
     captureEvent(getDistinctId(), 'project configured', {
@@ -3566,6 +3967,8 @@ async function toolUpdateCritiqueContext({ projectId, name, critiqueContext, cri
 // ─── Get Actionable Pins ──────────────────────────────────────────────────────
 
 async function toolGetActionablePins({ projectId, mode } = {}) {
+  const blocked = await selectionGate(projectId);
+  if (blocked) return blocked;
   let result = await withAuthoritativeImplementationRead(
     () => core.toolGetActionablePins(coreConfig, { projectId: resolveProjectFilter(projectId), mode }, SYNC_SERVER_URL ? fetchRemoteAnnotations : null),
     { totalActionable: 0, pins: [], breakdown: {} },
@@ -3727,6 +4130,8 @@ async function toolAgencyCoordination(action, args = {}) {
 // callers get the full payload (median + p25 + p75 + humanized strings).
 
 async function toolGetTimeToFixMetrics({ projectId, scope } = {}) {
+  const blocked = await selectionGate(projectId);
+  if (blocked) return blocked;
   const result = await withAuthoritativeImplementationRead(
     () => core.toolGetTimeToFixMetrics(coreConfig, { projectId: resolveProjectFilter(projectId), scope }, SYNC_SERVER_URL ? fetchRemoteAnnotations : null),
     { sampleSize: 0, durations: [] },
@@ -3762,6 +4167,8 @@ async function toolAssignPinToAgent({ annotationId, assignedBy } = {}) {
 // ─── Implement Approved Pins ─────────────────────────────────────────────────
 
 async function toolGetApprovedPins({ projectId } = {}) {
+  const blocked = await selectionGate(projectId);
+  if (blocked) return blocked;
   let result = await withAuthoritativeImplementationRead(
     () => core.toolGetApprovedPins(coreConfig, { projectId: resolveProjectFilter(projectId) }, SYNC_SERVER_URL ? fetchRemoteAnnotations : null),
     { totalApproved: 0, totalInProgress: 0, totalActionable: 0, pages: [], packets: [] },
@@ -3779,6 +4186,8 @@ async function toolGetApprovedPins({ projectId } = {}) {
 }
 
 async function toolGetImplementationPacket({ pageUrl, projectId } = {}) {
+  const blocked = await selectionGate(projectId);
+  if (blocked) return blocked;
   const result = await withAuthoritativeImplementationRead(
     () => core.toolGetImplementationPacket(coreConfig, { pageUrl, projectId: resolveProjectFilter(projectId) }, SYNC_SERVER_URL ? fetchRemoteAnnotations : null),
     { pageUrl: pageUrl || null, pinCount: 0, pins: [] },
@@ -3979,7 +4388,7 @@ async function toolCreateInviteLink({ projectId, role = 'commenter', expiresInDa
   if (!licenseKey) {
     return {
       error: 'license_required',
-      message: 'Sign in to create invite links: run `npx pincushion-mcp login`, then restart the MCP server. Commenter invites are free on every plan.',
+      message: 'Sign in first with the sign_in tool. Commenter invites are free on every plan. Do not paste a license key.',
     };
   }
   if (!SYNC_SERVER_URL) return { error: 'Sync server not configured.' };
@@ -4792,7 +5201,7 @@ const server = new Server(
 // The same moment is the keyless setup's first authenticated MCP contact.
 function reportKeylessContact() {
   try {
-    const projectId = resolveProjectFilter();
+    const projectId = defaultProjectId();
     const licenseKey = resolveCloudSyncKey();
     const syncServerUrl = SYNC_SERVER_URL || (licenseKey ? CLOUD_SYNC_URL : null);
     let client = {};
@@ -4848,6 +5257,15 @@ const TOOL_META = {
   complete_deployment_capture_run:    { title: 'Complete Frame Refresh',   annotations: WI },
   get_time_to_fix_metrics:            { title: 'Time-to-Fix Metrics',      annotations: RO },
   get_setup_instructions:             { title: 'Setup Instructions',       annotations: RO },
+  // Not read-only: it opens the browser sign-in and saves the account credential locally.
+  sign_in:                            { title: 'Sign In',                  annotations: W },
+  propose_project_setup:              { title: 'Propose Project Setup',    annotations: RO },
+  confirm_project_setup:              { title: 'Confirm Project Setup',    annotations: WI },
+  start_first_crit:                   { title: 'Start First Crit',         annotations: W },
+  // Not read-only: on delivery it copies the crit's findings into the project.
+  get_first_crit_status:              { title: 'First Crit Status',        annotations: WI },
+  list_setup_pins:                    { title: 'List Setup Pins',          annotations: ROC },
+  invite_teammate:                    { title: 'Invite Teammate',          annotations: W },
   start_quickstart_demo:              { title: 'Start Quickstart Demo',    annotations: RO },
   resolve_quickstart_demo:            { title: 'Finish Quickstart Demo',   annotations: RO },
   get_project_context:                { title: 'Project Context',          annotations: RO },
@@ -5361,8 +5779,82 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'get_setup_instructions',
-      description: 'Continue an existing critique with claim, or start a project with setup and explicit editor selection. Includes authenticated project checks and exact approved-pin implementation guidance; the browser extension is optional.',
+      description: 'Continue an existing critique with claim, or start a project with sign_in, one confirm, and the first crit. Includes authenticated project checks and exact approved-pin implementation guidance; the browser extension is optional.',
       inputSchema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'sign_in',
+      description: 'Start or check browser sign-in for a stdio client. Returns a verification URL and expiry, then signed_in on a later call. Does not return a license key. A hosted OAuth client is already signed in and should not call this.',
+      inputSchema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'propose_project_setup',
+      description: 'Detect the project once from the git remote, package.json name, dev URL, and an https homepage when one is set. Returns a proposalId. Do not create the project until confirm_project_setup is called with confirmed: true.',
+      inputSchema: { type: 'object', properties: {} }
+    },
+    {
+      name: 'confirm_project_setup',
+      description: 'Create or update the project after one explicit confirm. The name comes from the detected site or repo. Requires confirmed: true and the proposalId from propose_project_setup. Pass active true to mark a new project active. Omit active and the first project on the account defaults to active. Allow does not create a project. A mismatch returns the fresh proposal instead of writing. Needs sign_in: the project counts as confirmed only after your Pincushion account accepts the registration; otherwise it returns an error with the reason (for example a plan limit) and confirms nothing. Once confirmed, it is saved for this folder and the signed-in account in .feedback/.first-crit/setup-project.json and is the default project of start_first_crit and of list_setup_pins, get_actionable_pins, implement_approved_pins, get_implementation_packet, get_annotations, get_feedback_summary and get_time_to_fix_metrics, also after a restart; if it cannot be saved the answer says so (selectionSaved: false) and it is not the default. The detected URLs the user confirmed count for start_first_crit even if an agent added them earlier. A folder already configured with --project-id or PINCUSHION_PROJECT_ID keeps that project: confirming changes nothing there, and another projectId returns folder_configured_for_other_project.',
+      inputSchema: {
+        type: 'object',
+        required: ['confirmed', 'proposalId'],
+        properties: {
+          confirmed: { type: 'boolean', description: 'Must be true. This is the one confirmation.' },
+          proposalId: { type: 'string', description: 'proposalId from propose_project_setup.' },
+          projectId: { type: 'string', description: 'Optional existing project id to update instead of creating another project.' },
+          active: { type: 'boolean', description: 'Whether this new project is active. Only an active project can invite, collect pins, run crits, and connect an agent. Omit it and the first confirmed project defaults to active.' }
+        }
+      }
+    },
+    {
+      name: 'start_first_crit',
+      description: 'Queue a new crit on the Pincushion crit worker for one public https URL, requested for your signed-in account (call sign_in first). Needs the folder\'s project first: set with --project-id / PINCUSHION_PROJECT_ID, else confirmed with confirm_project_setup; without one it starts nothing and returns project_required. The crit is bound to that project and to the signed-in account, and the answer names the project its findings will go to. Show the user the exact URL and ask before calling; pass confirmed: true only after the user agrees. The page must be on a host of that project (its URLs in your account, read at every call; a host and its www. variant match). A host an agent added with configure_project does not count (host_added_by_agent) until the user agrees it belongs to the project: tell the user the agent added it, and only if they agree pass hostAddedByAgentConfirmed: true, which saves that agreement. The crit\'s record is kept in this folder (.feedback/.first-crit/jobs.json, 10 crits, 7 days); if it cannot be saved the answer says so (recordSaved: false) and the token can only be polled until this server restarts. A project with only localhost URLs may review a confirmed public page. It never reuses another visitor\'s crit of the page. A localhost URL returns localhost_not_public and is not sent. Poll get_first_crit_status with the returned token. Uses the existing Free-plan crit caps.',
+      inputSchema: {
+        type: 'object',
+        required: ['url', 'confirmed'],
+        properties: {
+          url: { type: 'string', description: 'Public https URL to critique.' },
+          confirmed: { type: 'boolean', description: 'true only after the user agreed to have this exact URL reviewed.' },
+          hostAddedByAgentConfirmed: { type: 'boolean', description: 'Pass true only after the user was told that this page\'s host was added to the project by an agent with configure_project and agreed it belongs to the project. The agreement is saved.' }
+        }
+      }
+    },
+    {
+      name: 'get_first_crit_status',
+      description: 'Poll the first crit. Pass the token from start_first_crit. When it is delivered and its page matches the one started, its AI findings are copied into the project start_first_crit named, as open findings for the user to approve, never into another one: if another account is signed in now, or this folder now uses another project, nothing is added and the message says why. start_first_crit keeps a record of each crit in this folder (10 crits, 7 days, never the license key), so polling the same token after a restart still adds the findings, or reports as a receipt that they were already added. A token with no record in this folder gets its status only. If the host was added by an agent since the start, pass hostAddedByAgentConfirmed: true only after the user agrees it belongs to the project. The message names the project and the next call.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          token: { type: 'string', description: 'Token returned by start_first_crit.' },
+          jobId: { type: 'string', description: 'Same token, accepted for hosted clients that call the job id.' },
+          hostAddedByAgentConfirmed: { type: 'boolean', description: 'Pass true only after the user was told that the crit\'s host was added to the project by an agent with configure_project and agreed it belongs to the project. The agreement is saved.' }
+        }
+      }
+    },
+    {
+      name: 'list_setup_pins',
+      description: 'List actionable pins with likely files and links: the same read and the same default project as get_actionable_pins. Without projectId it uses the folder\'s default project: the one set with --project-id / PINCUSHION_PROJECT_ID, else the one confirmed with confirm_project_setup for this folder and the signed-in account, else the single project auto-discovered by URL; with none of those it reads every project. If the folder\'s selection file exists but cannot be read, it returns setup_selection_unreadable instead of reading. The first crit\'s findings land in the project start_first_crit named, as open pins. links.app opens the project in the Pincushion app, links.page and links.site open the pinned page, and links.ide opens the IDE handoff. An empty list is a finished result, not an error.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string', description: 'Optional project id. Hosted OAuth uses the grant project.' },
+          mode: { type: 'string', description: 'Optional actionable-pin mode.' }
+        }
+      }
+    },
+    {
+      name: 'invite_teammate',
+      description: 'Create one shareable invite link for a teammate. Commenter is free and the default. The result is the join URL. Editor invites use a paid seat.',
+      inputSchema: {
+        type: 'object',
+        required: ['projectId'],
+        properties: {
+          projectId: { type: 'string', description: 'Project the teammate should join.' },
+          role: { type: 'string', enum: ['commenter', 'editor'], description: 'Defaults to commenter.' },
+          expiresInDays: { type: 'number', description: 'Link lifetime in days. Default 30.' },
+          maxUses: { type: 'number', description: 'Use cap. 0 means no cap.' }
+        }
+      }
     },
     {
       name: 'start_quickstart_demo',
@@ -5532,7 +6024,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object',
         properties: {
-          projectId: { type: 'string', description: 'Optional project ID to filter by. If omitted, returns actionable pins across all projects.' },
+          projectId: { type: 'string', description: 'Optional project ID to filter by. Without projectId it uses the folder\'s default project: the one set with --project-id / PINCUSHION_PROJECT_ID, else the one confirmed with confirm_project_setup for this folder and the signed-in account, else the single project auto-discovered by URL; with none of those it reads every project. If the folder\'s selection file exists but cannot be read, it returns setup_selection_unreadable instead of reading.' },
           mode: { type: 'string', enum: ['auto-agent', 'follow-up', 'review'], description: 'Optional filter to return only pins of a specific mode. Omit to return all.' },
           mentionedUser: { type: 'string', description: 'Optional username to filter by @mention. Returns only pins where the thread contains "@username". Leading @ is optional (e.g. "josh" or "@josh").' }
         }
@@ -5552,7 +6044,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'approve_pin',
-      description: 'Mark a pin as approved for implementation. Only approved pins should be implemented by agents. This transitions the pin from "open" to "approved" status.',
+      description: 'Mark a pin as approved for implementation. Approval is the user\'s decision: show the user the pin and call this only after the user says to fix that pin; never approve a finding the user has not seen. Only approved pins should be implemented by agents. This transitions the pin from "open" to "approved" status.',
       inputSchema: {
         type: 'object',
         required: ['annotationId'],
@@ -5564,7 +6056,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'assign_pin_to_agent',
-      description: 'Assign a pin directly to your local coding agent. Promotes the pin to "ready" (if not already), marks it as pending_implementation, and drops a trigger file in .feedback/.agent-queue/ that agent-loop.mjs picks up and dispatches to Cursor / Claude Code / Codex. This is the first-class "assign to agent" action — turns a pin into agent work in one call. Workflow: assign_pin_to_agent → (agent-loop dispatches) → fix_and_resolve.',
+      description: 'Assign a pin directly to your local coding agent. Assigning an open pin approves it, which is the user\'s decision: call this only after the user has seen that pin and asked for it to be fixed. Promotes the pin to "ready" (if not already), marks it as pending_implementation, and drops a trigger file in .feedback/.agent-queue/ that agent-loop.mjs picks up and dispatches to Cursor / Claude Code / Codex. This is the first-class "assign to agent" action — turns a pin into agent work in one call. Workflow: assign_pin_to_agent → (agent-loop dispatches) → fix_and_resolve.',
       inputSchema: {
         type: 'object',
         required: ['annotationId'],
@@ -5580,7 +6072,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object',
         properties: {
-          projectId: { type: 'string', description: 'Optional project ID to filter by. If omitted, returns approved pins across all projects.' }
+          projectId: { type: 'string', description: 'Optional project ID to filter by. Without projectId it uses the folder\'s default project: the one set with --project-id / PINCUSHION_PROJECT_ID, else the one confirmed with confirm_project_setup for this folder and the signed-in account, else the single project auto-discovered by URL; with none of those it reads every project. If the folder\'s selection file exists but cannot be read, it returns setup_selection_unreadable instead of reading.' }
         }
       }
     },
@@ -5592,7 +6084,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['pageUrl'],
         properties: {
           pageUrl: { type: 'string', description: 'The page URL to fetch the packet for (exact match or substring, case-insensitive).' },
-          projectId: { type: 'string', description: 'Optional project ID to scope the search.' }
+          projectId: { type: 'string', description: 'Optional project ID to scope the search. Without projectId it uses the folder\'s default project: the one set with --project-id / PINCUSHION_PROJECT_ID, else the one confirmed with confirm_project_setup for this folder and the signed-in account, else the single project auto-discovered by URL; with none of those it reads every project. If the folder\'s selection file exists but cannot be read, it returns setup_selection_unreadable instead of reading.' }
         }
       }
     },
@@ -6217,10 +6709,17 @@ const TOOL_HANDLERS = createToolRegistry({
   get_time_to_fix_metrics: toolGetTimeToFixMetrics,
   apply_preview: async () => ({ success: false, error: 'apply_preview is not available in v1. Use fix_and_resolve instead.' }),
   get_setup_instructions: toolGetSetupInstructions,
+  sign_in: toolSignIn,
+  propose_project_setup: toolProposeProjectSetup,
+  confirm_project_setup: toolConfirmProjectSetup,
+  start_first_crit: toolStartFirstCrit,
+  get_first_crit_status: toolGetFirstCritStatus,
+  list_setup_pins: toolListSetupPins,
+  invite_teammate: toolInviteTeammate,
   get_project_context: toolGetProjectContext,
   get_project_write_authorization: toolGetProjectWriteAuthorization,
   get_project_identity_diagnostic: toolGetProjectIdentityDiagnostic,
-  configure_project: toolConfigureProject,
+  configure_project: toolConfigureProjectFromTool,
   get_deployment_reconciliation_status: toolGetDeploymentReconciliationStatus,
   manage_deployment_automation: toolManageDeploymentAutomation,
   update_critique_context: toolUpdateCritiqueContext,
@@ -6276,6 +6775,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       }
     }
 
+    enableCloudSyncAfterSignIn();
     const result = await dispatchTool(name, args, { signal: extra?.signal });
     reportKeylessContact();
     const localSampleAttached = maybeAttachLocalOnlySample(name, result);

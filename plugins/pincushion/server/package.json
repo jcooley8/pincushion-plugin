@@ -1,6 +1,6 @@
 {
   "name": "pincushion-mcp",
-  "version": "1.12.5",
+  "version": "1.14.0",
   "mcpName": "io.github.jcooley8/pincushion",
   "description": "Visual feedback as agent work packets. Stakeholders drop pins on your live app; your AI coding agent reads each pin (selector, screenshot, DOM, thread, acceptance criteria) via MCP and ships the fix.",
   "type": "module",
@@ -17,7 +17,7 @@
     "test": "npm run test:smoke && npm run test:transport",
     "test:smoke": "node tests/mcp-smoke.mjs",
     "test:transport": "node --experimental-vm-modules node_modules/.bin/jest --testRunner=jest-circus/runner --runInBand tests/agent-loop.test.js",
-    "test:all": "node --experimental-vm-modules node_modules/.bin/jest --testRunner=jest-circus/runner --runInBand && node --test tests/internal-accounts.test.mjs tests/realtime.contract.mjs tests/source-suggestions.test.mjs tests/submission-journal.test.mjs tests/annotation-sync.test.mjs tests/tool-registry.contract.mjs tests/claude-critique-package.test.mjs tests/setup-critique.test.mjs tests/setup-runtime.test.mjs tests/node-runtime.test.mjs tests/model-free-capture-report.test.mjs tests/server-json-repository.test.mjs",
+    "test:all": "node --experimental-vm-modules node_modules/.bin/jest --testRunner=jest-circus/runner --runInBand && node --test tests/internal-accounts.test.mjs tests/realtime.contract.mjs tests/source-suggestions.test.mjs tests/submission-journal.test.mjs tests/annotation-sync.test.mjs tests/tool-registry.contract.mjs tests/claude-critique-package.test.mjs tests/setup-critique.test.mjs tests/setup-runtime.test.mjs tests/node-runtime.test.mjs tests/model-free-capture-report.test.mjs tests/server-json-repository.test.mjs tests/open-url.test.mjs tests/state-catalog-parity.test.mjs",
     "preflight": "node scripts/preflight.mjs",
     "release:fallback": "node scripts/release-fallback.mjs",
     "build:mcpb": "node scripts/build-mcpb.mjs",
@@ -41,7 +41,9 @@
       "/tests/node-runtime.test.mjs$",
       "/tests/model-free-capture-report.test.mjs$",
       "/tests/internal-accounts.test.mjs$",
-      "/tests/server-json-repository.test.mjs$"
+      "/tests/server-json-repository.test.mjs$",
+      "/tests/open-url.test.mjs$",
+      "/tests/state-catalog-parity.test.mjs$"
     ],
     "modulePathIgnorePatterns": [
       "<rootDir>/build/"

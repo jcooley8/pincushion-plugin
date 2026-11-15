@@ -185,7 +185,7 @@ const DEFAULT_MESSAGES = Object.freeze({
   claim_token_invalid_or_expired: 'The Slack claim token is invalid or expired.',
   editor_seat_limit: 'The project has reached its editor seat limit.',
   seat_limit_reached: 'The project has reached its editor seat limit.',
-  project_read_only: 'This project is read-only because your plan includes fewer projects than you have. Upgrade at https://www.pincushion.io/pricing?ref=mcp-read-only, or choose which project stays active at https://www.pincushion.io/app. Nothing was deleted.',
+  project_read_only: 'This project is not active, so it cannot invite people, collect pins, run crits, or connect an agent. Upgrade at https://www.pincushion.io/pricing?ref=mcp-read-only, or switch which project is active at https://www.pincushion.io/app. Nothing was deleted.',
 });
 const SAFE_MESSAGES = new Set([
   ...Object.values(DEFAULT_MESSAGES),
