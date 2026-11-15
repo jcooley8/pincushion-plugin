@@ -1,18 +1,24 @@
-<!-- 2026-11-03: replaced the top of the README with a one-step install and first steps for Claude Code, Cursor, VS Code, Cline, and any other MCP client. -->
-
 # Pincushion
 
 Teammates and clients pin feedback on your live app in
 [Pincushion](https://www.pincushion.io). Each pin is a work packet for your
 coding agent: page URL, CSS selector, screenshot, DOM snippet, viewport and the
-comment thread. This repository is the install source for the Claude Code,
-Cursor and Codex plugins and the MCP registry metadata for `pincushion-mcp`
+comment thread. This repository is the plugin marketplace for Claude Code, Codex
+and Cursor and the MCP registry metadata for `pincushion-mcp`
 (npm `1.14.0`).
 
-Requires Node.js 22.22 or newer, or Node.js 24. Do not put a license key in
-any MCP config. Sign-in writes `~/.pincushion/license-key` for you.
+**Requires Node.js 22.22 or newer, or Node.js 24.** On older Node the server
+exits at start and the Pincushion tools just don't appear. Check with
+`node --version`. Do not put a license key in any MCP config: sign-in writes
+`~/.pincushion/license-key` for you.
 
 ## Quick start
+
+One repository installs Pincushion in Claude Code, Codex and Cursor. Each host
+gets the same skills: `setup` signs you in and links your repo to a project from
+inside the agent, `doctor` checks what's missing without changing anything, and
+`pins`, `critique`, `implement`, `resolve`, `feedback-summary` and
+`send-feedback` do the work.
 
 ### Claude Code
 
@@ -21,15 +27,42 @@ claude plugin marketplace add jcooley8/pincushion-plugin
 claude plugin install pincushion@pincushion
 ```
 
-Codex uses the same marketplace: `codex plugin marketplace add jcooley8/pincushion-plugin`, then enable Pincushion from the Plugins list.
+Start Claude Code in your app's repository and run `/pincushion:setup`. Then
+`/pincushion:pins` lists open feedback and
+`/pincushion:critique https://your-site.example` runs a Pincushion crit of that
+URL. If anything looks off, run `/pincushion:doctor`.
 
-Start Claude Code in your app's repository. Run `/setup`, or run the sign-in command in [First steps](#first-steps). Then `/pins` lists open feedback and `/critique https://your-site.example` runs a Pincushion crit of that URL.
+### Codex
+
+```
+codex plugin marketplace add jcooley8/pincushion-plugin
+codex plugin add pincushion@pincushion
+```
+
+Start a new Codex task in your app's repository and ask: "Set up Pincushion
+for this repository." You can also install it from `/plugins` inside Codex.
 
 ### Cursor
 
-[Add Pincushion to Cursor](https://cursor.com/en/install-mcp?name=pincushion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInBpbmN1c2hpb24tbWNwIl19).
+For a team: in the Cursor dashboard open **Plugins & MCPs → Add Marketplace →
+Import from Repo**, enter `https://github.com/jcooley8/pincushion-plugin`, then
+install Pincushion from **Customize**.
 
-That deeplink installs `npx -y pincushion-mcp` over stdio and does not set a license key. Restart Cursor in your app's repository, then follow [First steps](#first-steps). `/pins` and `/critique <url>` ship with the Cursor plugin in this repository.
+For one machine, link the plugin folder into Cursor's local plugins and reload
+the window (**Developer: Reload Window**):
+
+```
+git clone --depth 1 https://github.com/jcooley8/pincushion-plugin ~/.pincushion-plugin
+mkdir -p ~/.cursor/plugins/local && ln -s ~/.pincushion-plugin/plugins/pincushion ~/.cursor/plugins/local/pincushion
+```
+
+Then ask the agent: "Set up Pincushion for this repository."
+
+To add only the MCP server, without the skills:
+[Add Pincushion to Cursor](https://cursor.com/en/install-mcp?name=pincushion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsInBpbmN1c2hpb24tbWNwIl19).
+That deeplink installs `npx -y pincushion-mcp` over stdio and sets no license
+key. Restart Cursor in your app's repository, then follow
+[First steps](#first-steps).
 
 ### VS Code
 
@@ -73,7 +106,9 @@ Add this stdio server. Start the client in your app's repository so the server's
 
 ## First steps
 
-In your app's repository, run:
+With a plugin installed, run the `setup` skill (above): it signs you in with a browser link and links the repository to a project without leaving the agent.
+
+Without a plugin, run this in your app's repository:
 
 ```
 npx -y pincushion-mcp setup

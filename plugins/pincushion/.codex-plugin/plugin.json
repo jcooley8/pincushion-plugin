@@ -24,6 +24,7 @@
     "privacyPolicyURL": "https://www.pincushion.io/privacy",
     "termsOfServiceURL": "https://www.pincushion.io/terms",
     "defaultPrompt": [
+      "Set up Pincushion for this repository",
       "Show my open Pincushion pins",
       "Implement the approved Pincushion pins"
     ],
