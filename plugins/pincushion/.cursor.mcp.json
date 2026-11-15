@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "pincushion": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "pincushion-mcp@1.14.0",
+        "--project-dir",
+        "${workspaceFolder}",
+        "--cloud-sync"
+      ],
+      "env": {
+        "PINCUSHION_REF": "cursor-plugin"
+      }
+    }
+  }
+}

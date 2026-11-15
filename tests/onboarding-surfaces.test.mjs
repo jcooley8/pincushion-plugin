@@ -1,5 +1,5 @@
 // Checks the public install surfaces: no placeholder Cursor license key,
-// the Cursor plugin repository is the public repo, /critique is a Claude
+// the Cursor plugin pins the bundled server version, /critique is a Claude
 // skill that names the crit MCP tools, and llms-install.md has the Cline
 // stdio entry plus sign-in and pre-sign-in behavior.
 import assert from 'node:assert/strict';
@@ -8,17 +8,19 @@ import { test } from 'node:test';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('Cursor MCP config starts with no license key', () => {
-  const mcp = JSON.parse(read('../.cursor-plugin/mcp/pincushion.json'));
-  const plugin = JSON.parse(read('../.cursor-plugin/plugin.json'));
-  const env = mcp.env || {};
+test('Cursor MCP config starts with no license key and pins the bundled version', () => {
+  const mcp = JSON.parse(read('../plugins/pincushion/.cursor.mcp.json'));
+  const plugin = JSON.parse(read('../plugins/pincushion/.cursor-plugin/plugin.json'));
+  const server = mcp.mcpServers.pincushion;
+  const env = server.env || {};
+  const version = JSON.parse(read('../plugins/pincushion/server/package.json')).version;
   assert.equal(env.PINCUSHION_LICENSE_KEY, undefined);
   assert.equal(JSON.stringify(mcp).includes('your_license_key'), false);
   assert.equal(env.PINCUSHION_REF, 'cursor-plugin');
-  assert.equal(mcp.command, 'npx');
-  assert.deepEqual(mcp.args, ['pincushion-mcp', '--project-dir', '${workspaceFolder}']);
+  assert.equal(server.command, 'npx');
+  assert.deepEqual(server.args, ['-y', `pincushion-mcp@${version}`, '--project-dir', '${workspaceFolder}', '--cloud-sync']);
   assert.equal(plugin.repository, 'https://github.com/jcooley8/pincushion-plugin');
-  assert.equal(plugin.repository.includes('jcooley8/pincushion"') || plugin.repository.endsWith('/pincushion'), false);
+  assert.equal(plugin.mcpServers, './.cursor.mcp.json');
 });
 
 test('Claude plugin ships a /critique skill that uses the crit tools', () => {
@@ -44,10 +46,13 @@ test('Claude plugin ships a /critique skill that uses the crit tools', () => {
 
 test('README quick start names each client and llms-install.md is the Cline contract', () => {
   const readme = read('../README.md');
-  for (const heading of ['### Claude Code', '### Cursor', '### VS Code', '### Cline', '### Any other MCP client']) {
+  for (const heading of ['### Claude Code', '### Codex', '### Cursor', '### VS Code', '### Cline', '### Any other MCP client']) {
     assert.match(readme, new RegExp(heading));
   }
   assert.match(readme, /claude plugin marketplace add jcooley8\/pincushion-plugin/);
+  assert.match(readme, /codex plugin marketplace add jcooley8\/pincushion-plugin/);
+  assert.match(readme, /Import from Repo/);
+  assert.match(readme, /Node\.js 22\.22 or newer/);
   assert.match(readme, /code --install-extension pincushion\.pincushion-feedback/);
   assert.equal(readme.includes('your_license_key'), false);
 

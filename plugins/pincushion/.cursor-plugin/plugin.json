@@ -1,0 +1,19 @@
+{
+  "name": "pincushion",
+  "displayName": "Pincushion",
+  "version": "1.14.0",
+  "description": "Read, implement and resolve the feedback pins your team leaves on your live app. Installs the Pincushion MCP server and adds skills to set up and check the connection, list open pins, run a Pincushion crit of a URL, implement approved pins and resolve them.",
+  "author": {
+    "name": "Pincushion"
+  },
+  "homepage": "https://www.pincushion.io",
+  "repository": "https://github.com/jcooley8/pincushion-plugin",
+  "license": "MIT",
+  "logo": "assets/logo.png",
+  "keywords": ["pincushion", "visual-feedback", "mcp", "design-feedback", "qa", "code-review"],
+  "category": "developer-tools",
+  "tags": ["feedback", "mcp", "design-review"],
+  "skills": "./skills/",
+  "rules": "./rules/",
+  "mcpServers": "./.cursor.mcp.json"
+}

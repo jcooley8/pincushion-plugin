@@ -1,0 +1,16 @@
+{
+  "name": "pincushion",
+  "owner": {
+    "name": "Pincushion"
+  },
+  "metadata": {
+    "description": "Pincushion plugins: read, implement and resolve feedback pins on your live app."
+  },
+  "plugins": [
+    {
+      "name": "pincushion",
+      "source": "plugins/pincushion",
+      "description": "Read, implement and resolve the feedback pins your team leaves on your live app."
+    }
+  ]
+}
