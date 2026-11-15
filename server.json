@@ -17,12 +17,12 @@
     "url": "https://github.com/jcooley8/pincushion-plugin",
     "source": "github"
   },
-  "version": "1.12.5",
+  "version": "1.14.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "pincushion-mcp",
-      "version": "1.12.5",
+      "version": "1.14.0",
       "transport": {
         "type": "stdio"
       },

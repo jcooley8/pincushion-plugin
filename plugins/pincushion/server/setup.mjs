@@ -885,8 +885,10 @@ export async function runSetup(argv = [], opts = {}) {
       }
       if(!safeSetupEditorConfig(cwd,selectedEditor)){w('  Incomplete: editor config path is unsafe or unavailable; existing files preserved.\n');return 1;}
       if (selectedEditor !== 'manual') {
-        const approved = await askQuestion('  Install the locked Pincushion runtime and npm dependencies in this project and connect this selected editor? No global config, credentials or install scripts. [y/N] ');
-        if (!/^(y|yes)$/i.test(approved || '')) { w('  Incomplete: project runtime installation declined. No editor connection or critique started.\n'); return 1; }
+        const approved = await askQuestion('  Install the locked Pincushion runtime and npm dependencies in this project and connect this selected editor? No global config, credentials or install scripts. [Y/n] ');
+        // Enter means yes (2026-11-09): this step is what the person ran setup for.
+        // Only an explicit yes or an empty answer proceeds; anything else declines.
+        if (!/^(|y|yes)$/i.test(approved || '')) { w('  Incomplete: project runtime installation declined. No editor connection or critique started.\n'); return 1; }
         runtimeBinding = await (opts.prepareSetupRuntime || prepareSetupRuntime)({ cwd, consent: true });
         if (!runtimeBinding.ready) { connectFailed('runtime_install_failed', runtimeBinding.reason); w(`  Incomplete: ${runtimeBinding.reason}. Existing and incomplete runtime files are preserved; no client or critique started.\n`); return 1; }
       }

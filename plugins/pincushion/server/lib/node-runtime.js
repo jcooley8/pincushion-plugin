@@ -13,7 +13,10 @@ import { writeSync } from 'fs';
 // Node releases (25, 26, ...) start normally, with npm's engines advisory.
 export const SUPPORTED_NODE_ENGINE = '^22.22.0 || ^24.0.0';
 export const SUPPORTED_NODE_LABEL = 'Node.js 22.22+ or Node.js 24';
-export const NODE_UPGRADE_COMMAND = 'nvm install 22 && nvm use 22';
+// The refusal message names the releases that work and one way to get each.
+// `nvm install 22` installs the newest 22.x, which is 22.22 or later.
+export const NODE_UPGRADE_COMMAND = 'nvm install 24 && nvm use 24';
+export const NODE_UPGRADE_COMMAND_22 = 'nvm install 22 && nvm use 22';
 export const NODE_DOWNLOAD_URL = 'https://nodejs.org';
 export const NODE_RUNTIME_DOCS_URL = 'https://www.npmjs.com/package/pincushion-mcp#troubleshooting';
 
@@ -34,9 +37,14 @@ export function unsupportedNodeMessage(version, command) {
   return [
     'Pincushion needs ' + SUPPORTED_NODE_LABEL + '. You are running Node.js v' + String(version).replace(/^v/, '') + '.',
     '',
-    'Upgrade with nvm:',
+    'Versions that work: Node.js 24 (LTS), or Node.js 22.22 and later 22.x.',
+    'Versions that do not: Node.js 20 and older, and Node.js 22.0 to 22.21.',
+    '',
+    'To fix it, install Node.js 24 LTS from ' + NODE_DOWNLOAD_URL,
+    'Or with nvm:',
     '  ' + NODE_UPGRADE_COMMAND,
-    'Or download Node.js from ' + NODE_DOWNLOAD_URL,
+    '  ' + NODE_UPGRADE_COMMAND_22 + '   (to stay on Node.js 22)',
+    'Check the result with: node --version',
     '',
     rerunHint(command),
     'Docs: ' + NODE_RUNTIME_DOCS_URL,

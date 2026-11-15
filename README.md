@@ -7,7 +7,7 @@ Teammates and clients pin feedback on your live app in
 coding agent: page URL, CSS selector, screenshot, DOM snippet, viewport and the
 comment thread. This repository is the install source for the Claude Code,
 Cursor and Codex plugins and the MCP registry metadata for `pincushion-mcp`
-(npm `1.12.5`).
+(npm `1.14.0`).
 
 Requires Node.js 22.22 or newer, or Node.js 24. Do not put a license key in
 any MCP config. Sign-in writes `~/.pincushion/license-key` for you.

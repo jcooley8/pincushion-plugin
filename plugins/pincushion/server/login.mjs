@@ -1,4 +1,7 @@
 // `pincushion login` — one browser login per machine, no manual key entry.
+// 2026-11-03: beginAgentSignIn starts the same loopback flow without blocking
+// the MCP tool. The result is a URL and an expiry. The license key stays in
+// the key file and is never returned to the agent.
 //
 // Flow (no new secret in this package; reuses the web Google OAuth + init-session):
 //   1. start a loopback HTTP server on an ephemeral 127.0.0.1 port
@@ -27,7 +30,7 @@
 
 import http from 'http';
 import { spawn } from 'child_process';
-import { writeFileSync, mkdirSync, chmodSync } from 'fs';
+import { writeFileSync, mkdirSync, chmodSync, readFileSync } from 'fs';
 import { homedir, platform } from 'os';
 import { join, dirname } from 'path';
 import { randomBytes } from 'crypto';
@@ -38,7 +41,10 @@ import { randomBytes } from 'crypto';
 // the redirect hop and pins the origin we register.
 const DEFAULT_LOGIN_URL = 'https://www.pincushion.io/cli-login';
 const DEFAULT_SYNC_URL = 'https://dpsqzszdviltqvethxbr.supabase.co/functions/v1/sync-annotations';
-const TIMEOUT_MS = 5 * 60 * 1000;
+// 15 minutes, the lifetime of the emailed sign-in link. cli-login.html tells the
+// person to open that link "within 15 minutes", so the listener waits as long.
+export const LOGIN_TIMEOUT_MINUTES = 15;
+const TIMEOUT_MS = LOGIN_TIMEOUT_MINUTES * 60 * 1000;
 const DEVELOPER_SETUP_SOURCES = new Set(['setup', 'claim']);
 const LOOPBACK_SECURITY_HEADERS = Object.freeze({
   'Cache-Control': 'no-store',
@@ -143,7 +149,14 @@ export function openUrl(url) {
     plat === 'darwin' ? ['open', [url]] :
     plat === 'win32'  ? ['cmd', ['/c', 'start', '', url]] :
                         ['xdg-open', [url]];
-  try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref(); } catch { /* user can copy the URL */ }
+  // A missing opener (no xdg-open in a container, SSH or WSL session) fails
+  // asynchronously with an 'error' event, not a throw. Without a listener that
+  // event crashes the process and takes the sign-in callback server with it.
+  try {
+    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    child.on('error', () => { /* user can copy the URL */ });
+    child.unref();
+  } catch { /* user can copy the URL */ }
 }
 
 // Back-compat alias for the in-module call sites below.
@@ -181,11 +194,11 @@ function readCallbackBody(req) {
   });
 }
 
-// Analytics identity stitching after a successful sign-in: identify by the
-// returned email and alias this machine's install ID + hashed license id to it
-// (lib/posthog.js), then record `mcp_login_completed` on that person with the
-// install ID, so the install-to-account link is a queryable event as well as an
-// alias. A sign-in that does not complete records `connect_failed` with a
+// Analytics identity stitching after a successful sign-in: alias this machine's
+// install ID into the hashed license id (lib/posthog.js), then record
+// `mcp_login_completed` on that hashed license id with the install ID, so the
+// install-to-account link is a queryable event as well as an alias. The email
+// is never sent to analytics, as an id or a property. A sign-in that does not complete records `connect_failed` with a
 // closed-enum reason. Loaded lazily and fully non-fatal — login never depends on it.
 async function defaultLoginTelemetry() {
   const m = await import('./lib/posthog.js');
@@ -201,7 +214,7 @@ async function recordSignedInIdentity({ email, licenseKey, source, plan }, telem
   try {
     const t = telemetry || await defaultLoginTelemetry();
     const identified = t.identify({ email, licenseKey });
-    const completed = typeof t.loginCompleted === 'function' && t.loginCompleted({ email, source, plan });
+    const completed = typeof t.loginCompleted === 'function' && t.loginCompleted({ licenseKey, source, plan });
     if (identified || completed) await t.flush();
   } catch {
     // Telemetry must never fail a login.
@@ -304,14 +317,130 @@ export async function runLogin({ developerSetupIntent = false, developerSetupSou
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address();
       const loginUrl = buildLoginUrl({ base, port, state, developerSetupIntent, developerSetupSource });
-      console.log('Opening your browser to sign in with Google...');
+      console.log('Opening your browser to sign in...');
       console.log('If it does not open, paste this into your browser:\n  ' + loginUrl + '\n');
+      console.log(`Waiting up to ${LOGIN_TIMEOUT_MINUTES} minutes for you to finish signing in.`);
       openBrowser(loginUrl);
     });
 
     const timer = setTimeout(() => {
-      console.error('login: timed out after 5 minutes with no response.');
+      console.error(`login: timed out after ${LOGIN_TIMEOUT_MINUTES} minutes with no response.`);
       fail('login_timeout');
     }, TIMEOUT_MS);
   });
+}
+
+let agentSignIn = null;
+
+function licenseFilePresent() {
+  try {
+    const value = readFileSync(keyFilePath(), 'utf8');
+    return typeof value === 'string' && value.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function closeAgentSignIn() {
+  if (!agentSignIn) return;
+  clearTimeout(agentSignIn.timer);
+  try { agentSignIn.server.close(); } catch { /* already closed */ }
+  agentSignIn = null;
+}
+
+export function resetAgentSignInForTests() {
+  closeAgentSignIn();
+}
+
+// Non-blocking browser sign-in for the sign_in MCP tool. A second call while
+// the link is still valid returns the same URL. The license key is written to
+// the key file and is not part of the tool result.
+export async function beginAgentSignIn({ openImpl = openUrl, now = Date.now() } = {}) {
+  if (licenseFilePresent() || agentSignIn?.done) {
+    return { status: 'signed_in', method: agentSignIn?.done ? 'browser' : 'license_file' };
+  }
+  if (agentSignIn && now < agentSignIn.expiresAt) {
+    return {
+      status: 'pending',
+      verificationUrl: agentSignIn.verificationUrl,
+      expiresAt: new Date(agentSignIn.expiresAt).toISOString(),
+    };
+  }
+  closeAgentSignIn();
+  const state = randomBytes(16).toString('hex');
+  const expiresAt = now + TIMEOUT_MS;
+  const server = http.createServer(async (req, res) => {
+    const url = new URL(req.url || '/', 'http://127.0.0.1');
+    if (url.pathname !== '/callback') {
+      res.writeHead(404, loopbackHeaders('text/plain; charset=utf-8'));
+      res.end('not found');
+      return;
+    }
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      res.writeHead(405, loopbackHeaders('text/plain; charset=utf-8'));
+      res.end('method not allowed');
+      return;
+    }
+    let params = url.searchParams;
+    if (req.method === 'POST') {
+      try { params = new URLSearchParams(await readCallbackBody(req)); }
+      catch {
+        res.writeHead(413, loopbackHeaders('text/plain; charset=utf-8'));
+        res.end('callback body too large');
+        return;
+      }
+    }
+    if ((params.get('state') || '') !== state) {
+      res.writeHead(400, loopbackHeaders('text/html; charset=utf-8'));
+      res.end(page('Login failed', 'Security check failed (state mismatch). Start sign-in again.'));
+      return;
+    }
+    const key = (params.get('key') || '').trim();
+    if (!key) {
+      res.writeHead(400, loopbackHeaders('text/html; charset=utf-8'));
+      res.end(page('Login failed', 'No account was returned. Start sign-in again.'));
+      return;
+    }
+    const keyFile = keyFilePath();
+    try {
+      mkdirSync(dirname(keyFile), { recursive: true });
+      writeFileSync(keyFile, `${key}\n`, { mode: 0o600 });
+      chmodSync(keyFile, 0o600);
+    } catch {
+      res.writeHead(500, loopbackHeaders('text/html; charset=utf-8'));
+      res.end(page('Login failed', 'Could not save the sign-in on this machine.'));
+      return;
+    }
+    if (agentSignIn) agentSignIn.done = true;
+    res.writeHead(200, loopbackHeaders('text/html; charset=utf-8'));
+    res.end(page("You're signed in", 'You can close this tab and return to your editor.', { scrubCallbackQuery: true }));
+    clearTimeout(agentSignIn?.timer);
+    try { server.close(); } catch { /* the result is already saved */ }
+  });
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+  } catch {
+    return { status: 'error', error: 'loopback_unavailable', message: 'Could not open a local sign-in page. Try again.' };
+  }
+  const address = server.address();
+  const port = address && typeof address === 'object' ? address.port : 0;
+  const verificationUrl = buildLoginUrl({
+    port,
+    state,
+    developerSetupIntent: true,
+    developerSetupSource: 'setup',
+  });
+  const timer = setTimeout(() => { closeAgentSignIn(); }, Math.max(0, expiresAt - Date.now()));
+  if (typeof timer.unref === 'function') timer.unref();
+  agentSignIn = { server, state, expiresAt, verificationUrl, done: false, timer };
+  try { openImpl(verificationUrl); } catch { /* the URL is in the tool result */ }
+  return {
+    status: 'pending',
+    verificationUrl,
+    expiresAt: new Date(expiresAt).toISOString(),
+    message: 'Open this URL and finish sign-in in the browser. Call sign_in again to check. The license key is not returned here.',
+  };
 }

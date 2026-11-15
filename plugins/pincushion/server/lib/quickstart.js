@@ -142,11 +142,14 @@ export function buildQuickstartInvitation() {
 export const MCP_LOCAL_SETUP_COMMAND = 'npx -y pincushion-mcp setup --ref mcp-local';
 export const MCP_LOCAL_CRIT_URL = 'https://www.pincushion.io/crit?ref=mcp-local';
 
-// Short enough for an agent to paste to the user verbatim.
+// Short enough for an agent to paste to the user verbatim. The agent may have
+// no terminal (an editor or registry install), so the sign_in tool comes
+// first and the terminal command is the alternative.
 export function buildLocalOnlyBanner() {
   return [
     '⚠ Pincushion is running local-only (not signed in): only pins in this repo\'s .feedback/ are visible.',
-    `Connect a real project with one command: ${MCP_LOCAL_SETUP_COMMAND}`,
+    'Connect a real project: call the sign_in tool, then propose_project_setup and confirm_project_setup.',
+    `Or, in a terminal, run: ${MCP_LOCAL_SETUP_COMMAND}`,
     `Or get a free AI crit of any page: ${MCP_LOCAL_CRIT_URL}`,
   ].join('\n');
 }
@@ -168,7 +171,7 @@ export function buildLocalOnlySample() {
       acceptanceCriteria: p.acceptanceCriteria,
     },
     tryIt: 'Call start_quickstart_demo to fix this sample pin on a throwaway copy of the demo page (~60s, nothing written to your project or the cloud).',
-    nextStep: `To see real pins from your own app, run: ${MCP_LOCAL_SETUP_COMMAND}`,
+    nextStep: `To see real pins from your own app, call the sign_in tool (or, in a terminal, run: ${MCP_LOCAL_SETUP_COMMAND})`,
     freeCrit: MCP_LOCAL_CRIT_URL,
   };
 }
@@ -212,8 +215,8 @@ export function buildDemoResolvedPayload({ fixDescription = '', diff = '', store
       headline: 'Now do it on YOUR app:',
       step1: 'Have a critique report? Run `npx pincushion-mcp claim <report-token>` in its repository. Starting without a report? Run `npx pincushion-mcp setup` and explicitly choose your editor.',
       step2: `Confirm authenticated access to the intended project after restarting your editor if needed. The browser extension is optional for new feedback: ${storeUrl || 'https://www.pincushion.io/install/chrome'}`,
-      step3: 'Explicitly approve one existing AI or human finding, ask your agent to read that exact pin, then implement it. Record deployment and verification separately.',
-      activationTip: 'If you choose the optional extension, sign in with the same Google account used for Pincushion. Extension installation is not an activation milestone.',
+      step3: 'A first project claimed from an AI crit starts with its AI findings approved (except any someone else replied to): ask your agent to read one and implement it. For any other finding, explicitly approve it first, ask your agent to read that exact pin, then implement it. Record deployment and verification separately.',
+      activationTip: 'If you choose the optional extension, sign in with Google using the same email address as your Pincushion account. Extension installation is not an activation milestone.',
       oneCommandSetup: 'Without a report, run `npx pincushion-mcp setup` in the intended repository. Select your editor; supported configuration preserves unrelated settings. Others receive a manual path. Configuration written does not prove project access or an exact-pin read.',
       // Extension-free path: a paste-able widget that writes a REAL pin straight
       // from the page. Skips the activation cliff for a first real pin.

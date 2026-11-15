@@ -2852,7 +2852,7 @@ export async function toolGetApprovedPins(config, { projectId } = {}, fetchRemot
       '2. Read the full thread to understand the stakeholder request, then implement the change',
       '3. Call claim_pin(annotationId) to mark it in-progress before starting (skip if already in-progress)',
       '4. After implementing, call fix_and_resolve(annotationId, fixDescription, commitSha?) to close the pin (pass commitSha after committing for the dashboard backlink)',
-      '5. Commit body must include Pin-ID: <id>. If traceability[pin.projectId].commitTrailers is "standard", also add Reviewed-By: <pin.approvedBy> on a new line — but ONLY if approvedBy differs from the git committer email (skip self-approval). If "full", also add Pincushion-Pin-Url: <pin.pincushionPinUrl>. If "minimal" (default), Pin-ID alone.',
+      '5. Commit body must include Pin-ID: <id>. If traceability[pin.projectId].commitTrailers is "standard", also add Reviewed-By: <pin.approvedBy> on a new line — but ONLY if approvedBy differs from the git committer email (skip self-approval) and names a person: an automatic approval such as "Owner claim: first project (automatic)" is not a review, so add no Reviewed-By for it. If "full", also add Pincushion-Pin-Url: <pin.pincushionPinUrl>. If "minimal" (default), Pin-ID alone.',
       '6. Inline comments: only when traceability[pin.projectId].attributionComments is "context-warrants" AND the pin captures a non-obvious WHY (a constraint, intent, or rationale not self-evident from the diff). Format: // Pincushion <pinId>: <one-line WHY>. Skip for cosmetic fixes (typos, color tweaks, copy edits).',
       'NOTE: Implement on the current branch. Do NOT create branches unless the dev asks. If a git command fails with "Unable to create ... .lock", another git process is in flight — wait, retry, or surface the conflict to the user. Do NOT delete files under .git/.',
     ],
@@ -4554,6 +4554,8 @@ export async function toolLinkPinDeploy(config, { annotationId, deployUrl, deplo
   return { success: false, error: `Annotation "${annotationId}" not found` };
 }
 
+export const REVIEW_PIN_APPROVAL_NOTE = 'Pins in mode "review" are open findings nobody has approved yet: show each one to the user, call approve_pin only for the ones the user wants fixed, and implement a pin only after it is approved (claim_pin, make the change, fix_and_resolve).';
+
 export async function toolGetActionablePins(config, { projectId, mode, mentionedUser } = {}, fetchRemote = null) {
   const allData = await readAllAnnotations(config, fetchRemote);
   const actionable = [];
@@ -4710,6 +4712,9 @@ export async function toolGetActionablePins(config, { projectId, mode, mentioned
   // Build priority-ordered instructions
   let instructions;
   if (approvedCount > 0) {
+    // 2026-11-12: the agent-started first crit no longer makes the requester
+    // claim, so its findings never arrive approved; an approved pin here was
+    // approved by a person or by the web app's first-project claim.
     instructions = `⚡ ${approvedCount} APPROVED PIN(S) — IMPLEMENT NOW.\n` +
       'These pins have been approved by stakeholders and are waiting for you to implement.\n' +
       'Workflow:\n' +
@@ -4717,12 +4722,21 @@ export async function toolGetActionablePins(config, { projectId, mode, mentioned
       '  2. For each pin: claim_pin → find the code using the element selector → make the change → fix_and_resolve\n' +
       '  3. Commit and push the branch\n' +
       (inProgressCount > 0 ? `\nAlso: ${inProgressCount} pin(s) already claimed but not yet resolved — finish those too.\n` : '') +
-      (actionable.length > approvedCount + inProgressCount ? `\n${actionable.length - approvedCount - inProgressCount} other pin(s) also need attention.` : '');
+      (actionable.length > approvedCount + inProgressCount ? `\n${actionable.length - approvedCount - inProgressCount} other pin(s) also need attention.` : '') +
+      (reviewCount > 0 ? `\n${REVIEW_PIN_APPROVAL_NOTE}` : '');
   } else if (inProgressCount > 0) {
-    instructions = `${inProgressCount} pin(s) are claimed/in-progress but not yet resolved. Finish implementation and call fix_and_resolve for each.`;
+    instructions = `${inProgressCount} pin(s) are claimed/in-progress but not yet resolved. Finish implementation and call fix_and_resolve for each.` +
+      (reviewCount > 0 ? ` ${REVIEW_PIN_APPROVAL_NOTE}` : '');
   } else if (actionable.length > 0) {
+    // 2026-11-10: open review pins (e.g. AI findings copied into a project by
+    // the first crit) are not approved. "For all pins: implement" invited the
+    // agent to skip the user's approval.
+    const otherCount = actionable.length - reviewCount;
     instructions = `${actionable.length} pins awaiting attention (${summary}). ` +
-      'For all pins: read the thread, implement the change, then call fix_and_resolve({ annotationId, fixDescription }).';
+      (reviewCount > 0 ? REVIEW_PIN_APPROVAL_NOTE : '') +
+      (otherCount > 0
+        ? `${reviewCount > 0 ? ' For the other pins' : 'For all pins'}: read the thread, implement the change, then call fix_and_resolve({ annotationId, fixDescription }).`
+        : '');
   } else {
     instructions = 'No pins are currently awaiting attention.';
   }
@@ -6198,8 +6212,8 @@ function freeProjectLimitHint(status, body) {
   const used = count(body.used) ?? count(body.current_count);
   const cap = count(body.cap) ?? 1;
   const usage = used === null ? '' : ` (${used} of ${cap} used)`;
-  return `Free plan project limit reached${usage}: the Free plan includes ${cap} project${cap === 1 ? '' : 's'}. `
-    + 'Existing projects keep working. Upgrade to Pro for unlimited projects: https://www.pincushion.io/pricing?ref=mcp-project-limit';
+  return `Free plan active-project limit reached${usage}: the Free plan includes ${cap} active project${cap === 1 ? '' : 's'}. `
+    + 'You can keep every project. Upgrade to Pro for unlimited active projects: https://www.pincushion.io/pricing?ref=mcp-project-limit';
 }
 
 export async function toolConfigureProject(config, {
@@ -6225,6 +6239,7 @@ export async function toolConfigureProject(config, {
   critiqueContext,
   deploymentAutomation,
   deploymentProvider,
+  planActive,
 } = {}) {
   if (!projectName) throw new Error('name is required');
 
@@ -6451,6 +6466,7 @@ export async function toolConfigureProject(config, {
           critiqueContext: projects[projectId].critiqueContext,
           critiqueContextCompiledAt: projects[projectId].critiqueContextCompiledAt,
           critiqueContextPinsAtCompile: projects[projectId].critiqueContextPinsAtCompile,
+          ...(typeof planActive === 'boolean' ? { planActive } : {}),
         }),
       });
       if (resp.ok) {
@@ -6761,7 +6777,7 @@ export async function toolConfigureProject(config, {
         // SAME account that owns this project. Because sign-in returns the same
         // license key per Google email, "same account" is the whole trick — and the
         // #1 reason a fresh install configures a project but never sees the FAB.
-        ? `To make the pin UI appear on these URLs: open the Pincushion extension and sign in with the SAME Google account you used for \`npx pincushion-mcp login\`. Same account = same workspace = the FAB activates automatically (within ~30s). No browser extension at all? Drop the embedded widget on your page instead — ask me for the Pincushion widget snippet (projectId ${projectId}) to capture a real pin with no install.`
+        ? `To make the pin UI appear on these URLs: open the Pincushion extension and sign in with Google using the SAME email address you used for \`npx pincushion-mcp login\`. Same account = same workspace = the FAB activates automatically (within ~30s). No browser extension at all? Drop the embedded widget on your page instead — ask me for the Pincushion widget snippet (projectId ${projectId}) to capture a real pin with no install.`
         : `Not signed in, so this project is saved locally only and the extension can't see it yet. Run \`npx pincushion-mcp login\` to sync, then sign the extension into that same account so the pin UI activates on these URLs.`,
     ].join('\n\n') + deployInstructions,
   };

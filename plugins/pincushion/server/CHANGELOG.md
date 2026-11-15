@@ -4,6 +4,58 @@ All notable changes to `pincushion-mcp` are documented here. Format follows [Kee
 
 ## [Unreleased]
 
+## [1.14.0] — 2026-11-11
+
+### Added
+
+- The agent-first first crit now lands in your project. `start_first_crit` binds the crit to the folder's project (the one set with `--project-id` / `PINCUSHION_PROJECT_ID`, else the one confirmed with `confirm_project_setup`; never one only auto-discovered by URL) and to the signed-in account, and names that project. When the crit is delivered, `get_first_crit_status` copies its AI findings into that project and no other: if another account is signed in (`account_changed`) or the folder now uses another project (`project_changed`), nothing is added and the message says why. They arrive as open findings: the agent shows them to the user and calls `approve_pin` on the ones the user wants fixed before implementing them, and `list_setup_pins`, `get_actionable_pins` and a restarted server all say so. Its message names the project and the next call.
+- `get_first_crit_status` and `sign_in` are no longer marked read-only: a delivered poll adds the findings to your project, and sign-in saves your account credential on this machine.
+- Each first crit started in a folder is recorded in that folder's `.feedback/.first-crit/jobs.json` (token, page, bound project, a hash of the account email, start time, and the result once added; at most 10, kept 7 days, mode 0600, never the license key or email), under a lock file that names its owner and is only broken when that owner process is gone, so concurrent servers keep every record. After a restart, polling the same token still adds a delivered crit's findings to its project, or answers with a receipt naming the project they were added to, and concurrent first polls share one copy. If the record cannot be written, `start_first_crit` says so (`recordSaved: false`, with the reason and file): the token can then only be polled until the server restarts; the attach then writes the whole record so a restart still answers with a receipt, and if that fails too the answer says the findings are in the named project and how to read them. An unreadable record file is never overwritten: writes fail visibly and polls return `job_records_unreadable` naming it. A token with no record says this machine has no record of it, so nothing was added by that call, and that an earlier session may already have added the findings.
+- If a first crit's findings were already saved to a different project of yours, `get_first_crit_status` says which one (`copied_elsewhere`) instead of reporting them as added to this folder's project.
+
+### Changed
+
+- **Behaviour change:** `start_first_crit` takes a required `confirmed: true`. The agent shows the user the exact URL and asks first; a call without it starts nothing.
+- **Behaviour change:** `start_first_crit` needs the folder's project first (set with `--project-id` / `PINCUSHION_PROJECT_ID`, or confirmed with `confirm_project_setup`). Without one it starts nothing and returns `project_required` with the next steps: `propose_project_setup`, show the user the detected name and URLs, `confirm_project_setup` with `confirmed: true`, then `start_first_crit` again. In 1.13.0 it queued a public crit with no project at all. It never makes the requester claim, which on a first project would mark AI findings approved before anyone had seen them (release review of 1.14.0).
+- `start_first_crit` requests the crit for your signed-in account (your account email as requester, `fresh: true`, as the web app's first project does), so it never hands back another visitor's recent crit of the same page. Signed out, it asks you to call `sign_in`; if your account email cannot be read, it says so and starts nothing.
+- `start_first_crit` only reviews a page on a host of the target project: the project's URLs read from your account at every check (the folder's `projects.json` stands in only when the cloud cannot be reached), so a project missing from `projects.json` no longer accepts any host and a URL the user adds in the Pincushion app counts on the next try. A host an agent added with `configure_project` does not count (`host_added_by_agent`) until the user agrees it belongs to the project: the agent tells the user and, only if they agree, passes `hostAddedByAgentConfirmed: true` to `start_first_crit` or `get_first_crit_status`, which saves that agreement; confirming the detected URLs with `confirm_project_setup` counts as agreement for those URLs. These hosts are kept in `~/.pincushion/agent-added-hosts.json` (no cap, no expiry, locked writes), so a restart or a second server does not lift them, and an unreadable file refuses the first crit (`host_ledger_unreadable`) rather than being treated as empty. `configure_project` with URLs first authenticates and resolves the destination the way registration does (by id, or by name in the account's projects), reads that project's URLs from your account, and records only the hosts it did not have, so resubmitting an existing URL (also name-only) is not flagged; if that read is unavailable the submitted hosts are recorded as unverified and refused with that reason. If the record cannot be written, `configure_project` changes nothing and says so. A host and its `www.` variant are one site; any other subdomain is not. If the project's URLs cannot be read it refuses (`project_urls_unknown`) and says to call `get_project_context`, or to run `npx pincushion-mcp setup` in a configured folder; a project with no site URL refuses (`project_has_no_urls`) until the user adds one in the Pincushion app. A localhost-only project still allows a confirmed public URL and says it is not one of the project's URLs. On delivery the report's page and the project's hosts are checked again before anything is added, and concurrent polls share one attach. A `PINCUSHION_CRIT_URL` that is not a loopback URL turns first crits off with `crit_url_invalid` instead of falling back to the production worker.
+- **Behaviour change:** `confirm_project_setup` confirms a project only after your account accepts the registration (`cloudSync: "synced"`). A rejected one (for example the Free plan's active-project limit, HTTP 402) returns `registration_not_acknowledged` with the reason, which project (if any) stays the default, and the next step; signed out it returns `sign_in_required`; in both cases nothing is confirmed. A confirmed project is saved for the folder and the signed-in account in `.feedback/.first-crit/setup-project.json` (no cap, no expiry); if that cannot be written the answer says so (`selectionSaved: false`, `confirmed: false`) and the project is not the folder's default. In a folder already configured with `--project-id` / `PINCUSHION_PROJECT_ID` it changes nothing and keeps that project; another `projectId` returns `folder_configured_for_other_project`.
+- **Behaviour change:** one default project for the whole workflow. Without `projectId`, `list_setup_pins`, `get_actionable_pins`, `implement_approved_pins`, `get_implementation_packet`, `get_annotations`, `get_feedback_summary` and `get_time_to_fix_metrics` use the project set with `--project-id` / `PINCUSHION_PROJECT_ID`, else the one confirmed with `confirm_project_setup` for this folder (read on every call, ignored when another account is signed in), else the single project auto-discovered by URL; with no selection ever made they behave as in 1.13.0. If the selection file exists but cannot be read, they return `setup_selection_unreadable` naming the file instead of reading every project, and `get_project_identity_diagnostic` reports the selection and whether the account can see its project. In 1.13.0 `list_setup_pins` could read the confirmed project while the implementation tools read another one, or every project.
+- A rate-limited check of the delivered report's page says to try `get_first_crit_status` again in a minute (`rate_limited`) instead of `report_unavailable`.
+- A server started signed out (an editor or registry install) now reads pins from the cloud as soon as a sign-in in the same session writes a key, instead of staying on the local `.feedback/` cache until a restart.
+- Pre-release source review of 1.14.0 (2026-11-12, two rounds): the binding, records, registration, default-project, agent-added host and URL-baseline changes above.
+- The signed-out banner leads with calling the `sign_in` tool; `npx -y pincushion-mcp setup --ref mcp-local` stays as the terminal alternative.
+- `login`, `setup` and `claim` print "Opening your browser to sign in..." instead of naming only Google. The page they open offers GitHub, Google and an emailed sign-in link.
+- The `configure_project` extension hint and the quickstart `activationTip` say to sign the extension in with Google using the same email address as your Pincushion account, instead of "the same Google account", since your CLI sign-in may have used GitHub or an emailed link.
+
+## [1.13.0] — 2026-11-10
+
+### Added
+
+- Setup tools for an agent with no terminal (#1310): `sign_in` returns a browser sign-in link, `propose_project_setup` and `confirm_project_setup` create or pick the project after you confirm, `start_first_crit` and `get_first_crit_status` run a first AI crit of a public URL, and `list_setup_pins` lists its findings.
+
+### Changed
+
+- Sign-in telemetry no longer carries your email address. `mcp_login_completed` is keyed on the hashed license id.
+- Tool text says "the Pincushion crit worker" (there is no separate hosted worker), and the Free plan summary in `get_setup_instructions` says 25 AI actions a month instead of "no usage caps".
+- `setup` installs the project runtime when you press Enter at the "Install the locked Pincushion runtime" question (`[Y/n]`). Answer `n` to decline.
+- Browser sign-in from `login`, `setup`, `claim` and the `sign_in` tool waits 15 minutes instead of 5, the same window as the emailed sign-in link.
+- The message for an unsupported Node.js lists the versions that work (Node.js 24 LTS, or 22.22 and later 22.x), the ones that do not, and how to install one. The supported range is the same.
+- Once a project has a first pin and no pin from a second person, `get_actionable_pins` and `get_feedback_summary` add one `reviewerNudge` field asking the agent to suggest sending the review link to one reviewer. It shows once per project per machine and never blocks implementation. It replaces `firstPinNudge`, which showed only before the first pin.
+- Setup, startup and `claim` text say that a first project claimed from an AI crit starts with its AI findings approved and ready for the agent, except any someone else replied to. Every other finding still needs a person to approve it. `claim` prints the count the server approved. A commit gets no `Reviewed-By` trailer for an automatic approval.
+
+## [1.12.7] — 2026-11-08
+
+### Fixed
+
+- Crit reports count unique findings in `pinCount` instead of the desktop and mobile copies of each finding (#1378). 1.12.6 never reached npm, so this release also carries the browser-opener fix listed below.
+
+## [1.12.6] — 2026-11-05
+
+### Fixed
+
+- `setup`, `login` and `claim` no longer crash when the machine has no browser opener (no `xdg-open` in a WSL, SSH, dev container or Codespaces session). The sign-in URL they print stays live, so you can open it yourself.
+
 ## [1.12.5] — 2026-11-01
 
 ### Fixed

@@ -124,11 +124,6 @@ function _emit(entry) {
     ph.identify({ distinctId: entry.distinctId, properties: entry.properties });
     return;
   }
-  if (entry.kind === 'capture_person') {
-    // Already a person id (the signed-in email): never hashed or replaced.
-    ph.capture({ distinctId: entry.distinctId, event: entry.event, properties: entry.properties });
-    return;
-  }
   const { distinctId, event, properties } = entry;
   ph.capture({ distinctId: resolveEventDistinctId(distinctId), event, properties });
 }
@@ -344,19 +339,21 @@ export function identifySignedInUser({ email, licenseKey } = {}) {
   }
 }
 
-// One event on the signed-in email person, carrying this machine's install ID,
-// so "which install became which account" is a queryable event and not only an
-// alias merge. Called by `pincushion login` right after identifySignedInUser.
+// One event on the signed-in account's hashed license id (`lic_…`), carrying
+// this machine's install ID, so "which install became which account" is a
+// queryable event and not only an alias merge. Called by `pincushion login`
+// right after identifySignedInUser. The email is never an input here: the
+// server merges `lic_…` into the account's `usr_…` person (sync-annotations).
 // `source` is how the sign-in started (login, setup or claim).
-export function captureLoginCompleted({ email, source = 'login', plan = null } = {}) {
+export function captureLoginCompleted({ licenseKey, source = 'login', plan = null } = {}) {
   try {
     if (telemetryDisabled()) return false;
-    const normalized = String(email || '').trim().toLowerCase();
-    if (!normalized || !normalized.includes('@')) return false;
+    const key = typeof licenseKey === 'string' ? licenseKey.trim() : '';
+    if (!key) return false;
     const installId = getInstallId();
     _enqueue({
-      kind: 'capture_person',
-      distinctId: normalized,
+      kind: 'capture',
+      distinctId: key,
       event: 'mcp_login_completed',
       properties: {
         install_id: installId,

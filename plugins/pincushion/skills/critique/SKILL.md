@@ -21,7 +21,7 @@ Ask for the page URL if the user did not supply one. This is a one-off Crit, not
 
 ## Capture
 
-Use the plugin's vendored pincushion-mcp 1.12.5. Its `capture` command runs `scripts/capture-snapshot.mjs --critique`:
+Use the plugin's vendored pincushion-mcp 1.14.0. Its `capture` command runs `scripts/capture-snapshot.mjs --critique`:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/server/cli.js" capture <url> <outputDir> --inventory=<registered-urls-json-file>

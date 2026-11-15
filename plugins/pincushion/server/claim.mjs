@@ -88,7 +88,7 @@ function resolveLicenseKey(argv) {
 // drive it without a browser: runLogin defaults to login.mjs's flow (opens the
 // browser, writes ~/.pincushion/license-key), resolveKey re-reads after it.
 // Non-interactive callers (agents, CI) fail FAST with the old message — the
-// inline login opens a browser + blocks up to 5 minutes, which is a hang, not
+// inline login opens a browser + blocks up to 15 minutes, which is a hang, not
 // help, in a headless environment.
 export async function ensureLoggedIn(argv, deps = {}) {
   const resolveKey = deps.resolveKey || (() => resolveLicenseKey(argv));
@@ -316,6 +316,19 @@ export async function pollTagClaim({ post, attempts = 18, delayMs = 10000, sleep
   return { claimed: false };
 }
 
+// The line after a claim that says what the agent can work on. A count is
+// trusted only as a positive safe integer from the claim response: on a first
+// project the claim approved that many Pincushion AI findings. Anything else
+// keeps the approval step.
+export function claimNextStep(aiPinsReady) {
+  const ready = Number.isSafeInteger(aiPinsReady) && aiPinsReady > 0 ? aiPinsReady : 0;
+  if (!ready) {
+    return '  After restart, ask the agent to call get_actionable_pins. Review an existing AI or human finding, approve that exact pin, then ask it to implement it.';
+  }
+  const findings = ready === 1 ? '1 AI finding is' : `${ready} AI findings are`;
+  return `  This is your first project, so its ${findings} approved and ready. After restart, ask the agent to call get_actionable_pins and implement one. Findings from people, and AI findings someone else replied to, still need your approval.`;
+}
+
 // Exported so tests can drive it without touching process.argv. Dependency
 // seams keep successful-claim diagnostics read-only in tests as well.
 export async function runClaim(argv = [], deps = {}) {
@@ -348,7 +361,9 @@ export async function runClaim(argv = [], deps = {}) {
     });
   } catch { /* ownership claim remains available if this acknowledgement is unavailable */ }
 
-  const connectEditor = (selectedEditor) => {
+  // aiPinsReady is the server's count of Pincushion AI findings the claim
+  // itself approved (first project only). Without it nothing is assumed ready.
+  const connectEditor = (selectedEditor, aiPinsReady = 0) => {
     const choice = getEditorChoice(selectedEditor);
     if (!choice) {
       console.log('  No editor was selected, so no config was written. Claim ownership and agent connection are separate.');
@@ -374,7 +389,7 @@ export async function runClaim(argv = [], deps = {}) {
       console.log(`  ${editorManualCommand(selectedEditor)}`);
     }
     console.log('  Agent connection is not yet verified; an exact real pin read is pending.');
-    console.log('  After restart, ask the agent to call get_actionable_pins. Review an existing AI or human finding, approve that exact pin, then ask it to implement it.');
+    console.log(claimNextStep(aiPinsReady));
   };
 
   // 1. Preview the report — confirm it exists and identify the exact project.
@@ -468,13 +483,13 @@ export async function runClaim(argv = [], deps = {}) {
     const { claimed, result } = await pollTagClaim({ post });
     if (result?.error === 'free_project_limit') {
       // Fixed copy and pricing link, as in core.js: never echo a provider URL.
-      console.log('Claim failed: the Free plan includes 1 project. Existing projects keep working; the report stays viewable.');
-      console.log('Upgrade to Pro for unlimited projects: https://www.pincushion.io/pricing?ref=mcp-claim-limit');
+      console.log('Claim failed: the Free plan includes 1 active project. Existing projects keep working; the report stays viewable.');
+      console.log('Upgrade to Pro for unlimited active projects: https://www.pincushion.io/pricing?ref=mcp-claim-limit');
       return 1;
     }
     if (claimed) {
       console.log('✓ Claimed — pins are yours.');
-      connectEditor(selectedEditor);
+      connectEditor(selectedEditor, result?.ai_pins_ready);
       await reportDeploymentWarning();
       console.log(claimCaptureGuidance(projectUrl));
     } else {

@@ -1,13 +1,17 @@
-// setup-core.js — pure helpers for the `pincushion-mcp setup` wizard.
+// setup-core.js — pure helpers for project detection and editor config.
 // No interactivity here: detection, config-file writing, and string builders only,
 // so the wizard's readline shell stays thin and these stay unit-testable.
+// 2026-11-03: one-click setup detects a proposal from git, package.json, and a
+// real dev or deploy URL. Claude Code setup no longer writes a second project
+// .mcp.json when the plugin already provides the hosted server. A localhost
+// target may still write stdio, and only when no Pincushion server is present.
 // 2026-10-26: buildManualSteps leads with the no-account sample pin, then the
 // interactive setup command, so a non-TTY README run is not told to start a critique.
 import { existsSync, realpathSync, readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync, lstatSync, openSync, fstatSync, closeSync, linkSync, constants } from 'fs';
 import { join, resolve, dirname, basename } from 'path';
 import { homedir } from 'os';
 import { fileURLToPath } from 'node:url';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { parse as parseToml } from 'smol-toml';
 import { readSetupRuntimeBinding } from './setup-runtime.js';
 
@@ -119,6 +123,82 @@ export function detectProjectDefaults(cwd) {
   // No live URL is guessed. `<package-name>.vercel.app` (or .netlify.app) is a
   // global namespace, so the guess frequently named someone else's deployment.
   return { name, devUrl: detectDevUrl(cwd), stagingUrl: '', editor: detectEditor(cwd) };
+}
+
+export function isLoopbackTarget(value) {
+  if (typeof value !== 'string') return false;
+  const raw = value.trim();
+  if (!raw || /[\s#]/.test(raw)) return false;
+  try {
+    const url = new URL(raw.includes('://') ? raw : `http://${raw}`);
+    const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  } catch {
+    return false;
+  }
+}
+
+function httpsHomepage(value) {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' || url.username || url.password || url.hash) return '';
+    const path = url.pathname === '/' ? '' : url.pathname.replace(/\/$/, '');
+    return `${url.origin}${path}${url.search}`;
+  } catch {
+    return '';
+  }
+}
+
+export function setupProposalId(name, urls) {
+  const canonical = JSON.stringify({
+    name: String(name || '').trim(),
+    urls: [...new Set((Array.isArray(urls) ? urls : []).map((url) => String(url || '').trim()).filter(Boolean))].sort(),
+  });
+  return `setup${createHash('sha256').update(canonical).digest('hex').slice(0, 32)}`;
+}
+
+// One confirm uses this exact proposal. A deploy URL is included only when
+// package.json homepage is already an https URL. Nothing is guessed.
+export function detectSetupProposal(cwd) {
+  const defaults = detectProjectDefaults(cwd);
+  const pkg = readJsonSafe(join(cwd, 'package.json'));
+  const deployUrl = httpsHomepage(pkg?.homepage);
+  const urls = [];
+  if (defaults.devUrl) urls.push(defaults.devUrl);
+  if (deployUrl && !urls.includes(deployUrl)) urls.push(deployUrl);
+  return {
+    proposalId: setupProposalId(defaults.name, urls),
+    name: defaults.name,
+    urls,
+    signals: {
+      packageName: typeof pkg?.name === 'string' ? pkg.name : null,
+      gitRemote: gitRemoteName(cwd),
+      devUrl: defaults.devUrl || null,
+      deployUrl: deployUrl || null,
+    },
+    localhostOnly: urls.length > 0 && urls.every((url) => isLoopbackTarget(url)),
+  };
+}
+
+function jsonHasPincushionServer(value, depth = 0) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 2) return false;
+  const servers = value.mcpServers;
+  if (servers && typeof servers === 'object' && !Array.isArray(servers) && Object.hasOwn(servers, 'pincushion')) return true;
+  const projects = value.projects;
+  if (!projects || typeof projects !== 'object' || Array.isArray(projects)) return false;
+  return Object.values(projects).slice(0, 40).some((project) => jsonHasPincushionServer(project, depth + 1));
+}
+
+function claudeServerPresent(cwd, claudeHome) {
+  const paths = [
+    join(cwd, '.mcp.json'),
+    join(cwd, '.claude', 'settings.json'),
+    join(cwd, '.claude', 'settings.local.json'),
+    join(claudeHome, '.claude.json'),
+    join(claudeHome, '.claude', 'settings.json'),
+  ];
+  return paths.some((path) => jsonHasPincushionServer(readJsonSafe(path)));
 }
 
 // editor -> { file segments relative to cwd, top-level server map key }.
@@ -322,7 +402,7 @@ function writeCodexMcpConfig({ cwd, projectId, installedRuntime, runtimeBinding 
 // Returns { path, action: 'created'|'updated'|'already'|'skipped'|'manual' }. Never throws,
 // never touches global ~/.claude.json (clobbered while the app runs), never
 // clobbers an unparseable file, and writes atomically (temp + rename).
-export function writeEditorMcpConfig({ editor, cwd, projectId: rawProjectId, installedRuntime = false, runtimeBinding }) {
+export function writeEditorMcpConfig({ editor, cwd, projectId: rawProjectId, installedRuntime = false, runtimeBinding, targetUrl, localhostTarget = false, claudeHome = homedir() }) {
   if (runtimeBinding !== undefined && !readSetupRuntimeBinding({ cwd, artifactId: runtimeBinding?.artifactId }).ready) return { path: '', action: 'skipped', reason: 'runtime_missing_or_unverified', editor };
   const selectedEditor = normalizeEditorChoice(editor);
   const projectId = typeof rawProjectId === 'string' && rawProjectId.trim() ? rawProjectId.trim() : null;
@@ -330,6 +410,17 @@ export function writeEditorMcpConfig({ editor, cwd, projectId: rawProjectId, ins
   const conf = EDITOR_CONFIG[selectedEditor];
   if (!conf) return { path: '', action: 'manual', editor: selectedEditor };
   const path = join(cwd, ...conf.file);
+  // The Claude Code plugin already registers the hosted server. Writing a
+  // project .mcp.json creates a second server with the same name. Stdio is
+  // written only for a localhost target that does not already have one.
+  // A claim that pins a project id still updates a generated entry.
+  if (selectedEditor === 'claude' && !projectId) {
+    const localhost = localhostTarget === true || isLoopbackTarget(targetUrl);
+    const present = claudeServerPresent(cwd, claudeHome);
+    if (!localhost || present) {
+      return { path, action: 'skipped', reason: present ? 'already_present' : 'hosted_plugin', editor: 'claude' };
+    }
+  }
 
   // Defense-in-depth: never write the global ~/.claude.json (it gets clobbered
   // while the app runs — a real past incident). Not reachable by today's
@@ -394,7 +485,8 @@ export function buildWizardSummary({ project, editorResult, extensionStatus = 'n
     : '• Optional extension: not opened. It is only needed to place new browser pins.');
   lines.push('• Agent connection: not yet verified.');
   lines.push('• Exact real pin read: pending. After restart, ask your agent to call get_actionable_pins.');
-  lines.push('• Review an existing AI or human finding, approve that exact pin, then ask the agent to implement it.');
+  lines.push('• A first project claimed from an AI crit starts with its AI findings approved and ready for the agent, except any someone else replied to.');
+  lines.push('• For any other finding, review it, approve that exact pin, then ask the agent to implement it.');
   return lines.join('\n');
 }
 

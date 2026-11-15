@@ -157,7 +157,16 @@ export function normalizeGenerationManifest(input = {}) {
     journey.limitation,
     ...(Array.isArray(input.limitations) ? input.limitations.map((value) => text(value, 240)) : []),
   ]);
-  const pinCount = completeCaptures.reduce((sum, capture) => sum + capture.pinCount, 0);
+  // One finding is placed once per device capture, so summing capture counts
+  // double-counts it (3 findings x desktop+mobile = 6). Count unique findings
+  // per screen: the union of pin IDs, or the largest count when a capture
+  // carries no IDs.
+  const pinCount = screens.reduce((sum, screen) => {
+    const done = screen.captures.filter((capture) => capture.status === 'complete');
+    const ids = new Set(done.flatMap((capture) => capture.pinIds));
+    const unidentified = Math.max(0, ...done.filter((capture) => !capture.pinIds.length).map((capture) => capture.pinCount));
+    return sum + Math.max(ids.size, unidentified);
+  }, 0);
 
   return {
     version: 1,

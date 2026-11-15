@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "pincushion",
   "display_name": "Pincushion",
-  "version": "1.12.5",
+  "version": "1.14.0",
   "description": "Stakeholders pin feedback on your live app; your AI coding agent reads each pin via MCP and ships the fix.",
   "long_description": "Pincushion turns visual feedback into agent work packets. Stakeholders drop pins on your live app with the Pincushion browser extension; this MCP server exposes each pin — selector, screenshot, DOM snippet, thread, acceptance criteria — to your AI coding agent so it can read, claim, implement, and resolve feedback end to end. It reads your local project's .feedback/ directory and git; cloud sync, AI critique, and team collaboration unlock with an optional license key (free local-only mode otherwise).",
   "author": {
