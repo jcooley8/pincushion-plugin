@@ -30,7 +30,7 @@ export function isSupportedNodeVersion(version) {
 
 function rerunHint(command) {
   if (!command) return 'Then restart the Pincushion MCP server in your editor or agent.';
-  return 'Then run `npx pincushion-mcp ' + command + '` again.';
+  return 'Then run `npx -y pincushion-mcp@latest ' + command + '` again.';
 }
 
 export function unsupportedNodeMessage(version, command) {

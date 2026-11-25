@@ -1,7 +1,7 @@
 // `pincushion claim` — assert ownership of a public crit-report and attach it
 // to the developer's Pincushion license.
 //
-// Usage: npx pincushion-mcp claim <report-token> [--project-dir <dir>] [--license-key <key>]
+// Usage: npx -y pincushion-mcp@latest claim <report-token> [--project-dir <dir>] [--license-key <key>]
 //
 // Resolution order for the license key (mirrors server.js resolveCloudSyncKey):
 //   1. PINCUSHION_LICENSE_KEY env
@@ -100,7 +100,7 @@ export async function ensureLoggedIn(argv, deps = {}) {
   const existing = resolveKey();
   if (existing) return existing;
   if (!isInteractive) {
-    console.log('Not signed in. Run `npx pincushion-mcp login` first, or pass --license-key <key>.');
+    console.log('Not signed in. Run `npx -y pincushion-mcp@latest login` first, or pass --license-key <key>.');
     return null;
   }
   console.log('Signing you in first — opening your browser…');
@@ -339,13 +339,13 @@ export async function runClaim(argv = [], deps = {}) {
   const projectDir = resolve(projectDirRaw || process.cwd());
 
   if (!token) {
-    console.log('Usage: npx pincushion-mcp claim <report-token> [--project-dir <dir>] [--editor cursor|vscode|claude|codex|manual]');
+    console.log('Usage: npx -y pincushion-mcp@latest claim <report-token> [--project-dir <dir>] [--editor cursor|vscode|claude|codex|manual]');
     return 1;
   }
 
   const licenseKey = await (deps.ensureLoggedIn || ensureLoggedIn)(argv);
   if (!licenseKey) {
-    console.log("Sign-in didn't complete. Run `npx pincushion-mcp login` and retry.");
+    console.log("Sign-in didn't complete. Run `npx -y pincushion-mcp@latest login` and retry.");
     return 1;
   }
 
@@ -367,7 +367,7 @@ export async function runClaim(argv = [], deps = {}) {
     const choice = getEditorChoice(selectedEditor);
     if (!choice) {
       console.log('  No editor was selected, so no config was written. Claim ownership and agent connection are separate.');
-      console.log('  Configure your chosen MCP client with `npx pincushion-mcp --project-dir .`, then restart it.');
+      console.log('  Configure your chosen MCP client with `npx -y pincushion-mcp@latest --project-dir .`, then restart it.');
       console.log('  Agent connection is not yet verified; an exact real pin read is pending.');
       return;
     }
@@ -437,7 +437,7 @@ export async function runClaim(argv = [], deps = {}) {
       console.log('This crit was saved by the person who requested it. Proving you own the site with the live tag moves it to your account.');
     } else if (!resumeAuthorization.authorized) {
       console.log('This crit is already claimed. Your signed-in account was not confirmed for this exact project, so no editor configuration was changed.');
-      console.log('Open the report and its status with the account that owns or edits it, then retry `npx pincushion-mcp claim <report-token>`.');
+      console.log('Open the report and its status with the account that owns or edits it, then retry `npx -y pincushion-mcp@latest claim <report-token>`.');
       return 0;
     } else {
       const selectedEditor = await selectClaimEditor(argv, deps);
@@ -464,7 +464,7 @@ export async function runClaim(argv = [], deps = {}) {
   // path === 'tag': inject or show the meta-tag snippet.
   const r = injectMetaTag(projectDir, projectId);
   if (r.injected) {
-    console.log(`Added the ownership tag to ${r.file}. Deploy, then re-run: npx pincushion-mcp claim ${token}`);
+    console.log(`Added the ownership tag to ${r.file}. Deploy, then re-run: npx -y pincushion-mcp@latest claim ${token}`);
   } else {
     const snippet = r.snippet || `<meta name="pincushion-project" content="${projectId}">`;
     console.log(`Add this to your <head>, deploy, then re-run claim:\n  ${snippet}`);
@@ -493,7 +493,7 @@ export async function runClaim(argv = [], deps = {}) {
       await reportDeploymentWarning();
       console.log(claimCaptureGuidance(projectUrl));
     } else {
-      console.log(`Didn't detect the tag live yet — deploy, then re-run: npx pincushion-mcp claim ${token}`);
+      console.log(`Didn't detect the tag live yet — deploy, then re-run: npx -y pincushion-mcp@latest claim ${token}`);
     }
     return 0;
   }

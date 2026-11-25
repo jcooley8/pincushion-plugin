@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 // preflight.mjs — release drift guard for pincushion-mcp.
+// 2026-11-17: also requires package.json repository/bugs/homepage and the
+// desktop manifest repository to name the public plugin repo (the private
+// monorepo 404s on npm), and requires initialize serverInfo.version to match
+// package.json.
 //
 // Run before publishing (and in PR CI). Catches the exact failure classes that
 // have shipped "Could not attach to MCP server pincushion" to users:
@@ -28,6 +32,7 @@ const ok = (m) => console.log(`  ✓ ${m}`);
 const bad = (m) => { console.log(`  ✗ ${m}`); fail.push(m); };
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+const PUBLIC_REPO = 'https://github.com/jcooley8/pincushion-plugin';
 
 // ── 1. Version drift ─────────────────────────────────────────────────────────
 // PREFLIGHT_SKIP_VERSION=1 skips the "ahead of npm" check (use on PR CI, where
@@ -59,6 +64,18 @@ try {
   if (sjVers.every((v) => v === pkg.version)) ok(`server.json versions all match ${pkg.version}`);
   else bad(`server.json version(s) ${JSON.stringify(sjVers)} != package.json ${pkg.version}`);
 } catch (e) { bad(`server.json unreadable: ${e.message}`); }
+// npm's repository, bugs, and homepage links are public. The private monorepo
+// 404s, and the public mirror has no pincushion-mcp subdirectory, so a
+// directory field 404s too.
+if (pkg.repository?.type === 'git' && pkg.repository?.url === `git+${PUBLIC_REPO}.git` && pkg.repository.directory == null) {
+  ok('package.json repository is the public plugin repo with no subdirectory');
+} else {
+  bad(`package.json repository ${JSON.stringify(pkg.repository)} must be git+${PUBLIC_REPO}.git with no directory`);
+}
+if (pkg.bugs?.url === `${PUBLIC_REPO}/issues`) ok('package.json bugs.url is the public plugin repo');
+else bad(`package.json bugs.url ${JSON.stringify(pkg.bugs?.url)} must be ${PUBLIC_REPO}/issues`);
+if (pkg.homepage === 'https://www.pincushion.io') ok('package.json homepage is https://www.pincushion.io');
+else bad(`package.json homepage ${JSON.stringify(pkg.homepage)} must be https://www.pincushion.io`);
 // The registry entry is public: repository.url must be the public plugin repo,
 // not the private monorepo (404s publicly, so directories mark the server dead).
 try {
@@ -72,6 +89,10 @@ try {
   const mf = JSON.parse(readFileSync(join(ROOT, 'manifest.json'), 'utf8'));
   if (mf.version === pkg.version) ok(`manifest.json version matches ${pkg.version}`);
   else bad(`manifest.json version ${mf.version} != package.json ${pkg.version}`);
+  if (mf.repository?.url === PUBLIC_REPO) ok('manifest.json repository.url is the public plugin repo');
+  else bad(`manifest.json repository.url ${JSON.stringify(mf.repository?.url)} must be ${PUBLIC_REPO}`);
+  if (mf.homepage === 'https://www.pincushion.io') ok('manifest.json homepage is https://www.pincushion.io');
+  else bad(`manifest.json homepage ${JSON.stringify(mf.homepage)} must be https://www.pincushion.io`);
 } catch (e) { bad(`manifest.json unreadable: ${e.message}`); }
 
 // ── 2. Undeclared dependencies ───────────────────────────────────────────────
@@ -120,12 +141,15 @@ const result = await new Promise((resolve) => {
     }
   });
   child.stdin.write('{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"preflight","version":"1"}}}\n');
-  const hsTimer = setTimeout(() => { if (!handshaked) { try { child.kill('SIGKILL'); } catch {} resolve({ handshaked: false, exited: false }); } }, 15000);
-  const exitTimer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} resolve({ handshaked, exited: false }); }, 20000);
-  child.on('exit', () => { clearTimeout(hsTimer); clearTimeout(exitTimer); resolve({ handshaked, exited: true }); });
+  const hsTimer = setTimeout(() => { if (!handshaked) { try { child.kill('SIGKILL'); } catch {} resolve({ handshaked: false, exited: false, stdout: out }); } }, 15000);
+  const exitTimer = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} resolve({ handshaked, exited: false, stdout: out }); }, 20000);
+  child.on('exit', () => { clearTimeout(hsTimer); clearTimeout(exitTimer); resolve({ handshaked, exited: true, stdout: out }); });
 });
 if (result.handshaked) ok('completed MCP initialize handshake'); else bad('did NOT complete handshake within 15s');
 if (result.exited) ok('exited within ~5s of stdin close (no orphan)'); else bad('did NOT exit on stdin close — would orphan');
+const reportedVersion = String(result.stdout || '').match(/"serverInfo"\s*:\s*\{[^}]*"version"\s*:\s*"([^"]+)"/);
+if (reportedVersion && reportedVersion[1] === pkg.version) ok(`initialize serverInfo.version is ${pkg.version}`);
+else bad(`initialize serverInfo.version ${JSON.stringify(reportedVersion?.[1] ?? null)} != package.json ${pkg.version}`);
 
 // ── Verdict ──────────────────────────────────────────────────────────────────
 console.log('');

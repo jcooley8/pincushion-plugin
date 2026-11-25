@@ -52,7 +52,7 @@ Pincushion AI replies, crit of the latest deploy, pins that mention you).
 ## What the plugin runs
 
 For Claude Code, the plugin launches a vendored copy of the published
-`pincushion-mcp` 1.14.0 server from `server/` with
+`pincushion-mcp` 1.15.0 server from `server/` with
 `node ${CLAUDE_PLUGIN_ROOT}/server/cli.js --cloud-sync`. Nothing is fetched at
 launch. The server's npm dependencies are pinned in `package-lock.json`, which
 Claude Code installs when the plugin is installed. The server talks to
@@ -62,5 +62,5 @@ sign-in key in `~/.pincushion/`. The vendored source is licensed under
 `server/LICENSE.md` (FSL-1.1-Apache-2.0); the rest of the plugin is MIT.
 
 The Codex and Cursor plugins launch the exact pinned package
-(`npx -y pincushion-mcp@1.14.0`, see `.codex.mcp.json` and `.cursor.mcp.json`). `npx -y pincushion-mcp setup`
+(`npx -y pincushion-mcp@1.15.0`, see `.codex.mcp.json` and `.cursor.mcp.json`). `npx -y pincushion-mcp setup`
 works independently of any plugin.

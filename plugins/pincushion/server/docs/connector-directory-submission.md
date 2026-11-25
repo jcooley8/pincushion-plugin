@@ -72,7 +72,7 @@ publishes the `server.json` that points at the public repository:
 > (page, selector, screenshot, thread) and records the implementing commit on
 > each pin. Every tool declares a title and `readOnlyHint`/`destructiveHint`.
 > No credentials in the MCP config;
-> sign-in happens in the browser through `npx pincushion-mcp setup`.
+> sign-in happens in the browser through `npx -y pincushion-mcp@latest setup`.
 > Requesting the manual initial curation so it appears in the VS Code MCP gallery.
 
 ## Cline MCP Marketplace submission

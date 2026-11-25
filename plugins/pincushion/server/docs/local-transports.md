@@ -6,7 +6,7 @@ loopback port, so every local endpoint also checks its intended authority.
 
 ## REST wrapper
 
-`npx pincushion-mcp --rest --port 3456` binds only to
+`npx -y pincushion-mcp@latest --rest --port 3456` binds only to
 `127.0.0.1:3456`. Every request must use that exact Host header and include
 the current process's `X-Pincushion-Local-Capability` header. The server prints
 the capability file path at startup. It lives below

@@ -45,7 +45,7 @@ example `get_project_identity_diagnostic`. If they are missing, check that the
 server can start at all:
 
 - Claude Code: `node "${CLAUDE_PLUGIN_ROOT}/server/cli.js" --version`
-- Codex and Cursor: `npx -y pincushion-mcp@1.14.0 --version`
+- Codex and Cursor: `npx -y pincushion-mcp@1.15.0 --version`
 
 A version number means the package runs; the host has not loaded the server.
 Recommend restarting the session, then the host's MCP log if it still fails.

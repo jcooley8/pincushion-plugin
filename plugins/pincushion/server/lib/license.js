@@ -30,7 +30,7 @@ export function keyLast4(key) {
 /**
  * Build the loud rejected-license banner. Names WHICH source supplied the
  * rejected key and its last 4 chars so the user can find and fix the exact
- * stale config, plus the one-command recovery path (`npx pincushion-mcp login`).
+ * stale config, plus the one-command recovery path (`npx -y pincushion-mcp@latest login`).
  * @param {{ source?: string, last4?: string }} info captured at rejection time
  */
 export function buildRejectedLicenseBanner(info = {}) {
@@ -39,7 +39,7 @@ export function buildRejectedLicenseBanner(info = {}) {
   return [
     `⚠ PINCUSHION CLOUD SYNC IS OFF — your license key (…${last4}, from ${source}) was REJECTED (invalid or expired).`,
     'Pins are saving LOCALLY ONLY. Cloud pins, share reports, invites, and team features will NOT work.',
-    'Fix: run `npx pincushion-mcp login` to fetch a fresh key (writes ~/.pincushion/license-key),',
+    'Fix: run `npx -y pincushion-mcp@latest login` to fetch a fresh key (writes ~/.pincushion/license-key),',
     `or get your current key at https://www.pincushion.io/dashboard and update the ${source} source,`,
     'then restart the MCP server.',
     '', ''
@@ -72,7 +72,7 @@ export function requireProDecision({ toolName, plan, hasLicenseKey }) {
     return {
       error: 'license_required',
       message: `The "${toolName}" tool requires a PinCushion Pro or Team license. ` +
-        `Run \`npx pincushion-mcp login\` or pass --license-key YOUR_KEY when starting the MCP server, or upgrade at https://www.pincushion.io/pricing?ref=mcp-tool-gate`,
+        `Run \`npx -y pincushion-mcp@latest login\` or pass --license-key YOUR_KEY when starting the MCP server, or upgrade at https://www.pincushion.io/pricing?ref=mcp-tool-gate`,
       upgrade_url: 'https://www.pincushion.io/pricing?ref=mcp-tool-gate'
     };
   }

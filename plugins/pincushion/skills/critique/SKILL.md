@@ -21,7 +21,7 @@ Ask for the page URL if the user did not supply one. This is a one-off Crit, not
 
 ## Capture
 
-Use pincushion-mcp 1.14.0. Its `capture` command runs `scripts/capture-snapshot.mjs --critique`. In Claude Code, run the plugin's vendored copy:
+Use pincushion-mcp 1.15.0. Its `capture` command runs `scripts/capture-snapshot.mjs --critique`. In Claude Code, run the plugin's vendored copy:
 
 ```
 node "${CLAUDE_PLUGIN_ROOT}/server/cli.js" capture <url> <outputDir> --inventory=<registered-urls-json-file>
@@ -30,7 +30,7 @@ node "${CLAUDE_PLUGIN_ROOT}/server/cli.js" capture <url> <outputDir> --inventory
 In Codex, Cursor or any host where `CLAUDE_PLUGIN_ROOT` is not set, run the same pinned package:
 
 ```
-npx -y pincushion-mcp@1.14.0 capture <url> <outputDir> --inventory=<registered-urls-json-file>
+npx -y pincushion-mcp@1.15.0 capture <url> <outputDir> --inventory=<registered-urls-json-file>
 ```
 
 Add `--page-only` only when the user explicitly asks for one page. Add `--require-auth` for a signed-in app. Do not create login state. If auth is missing, stop and tell the user to run `npx -y pincushion-mcp snapshot --login <url> --proof-selector <selector-only-visible-when-signed-in>` first. Capture is unavailable on Windows; say so and stop instead of claiming a review.

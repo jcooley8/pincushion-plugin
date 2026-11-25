@@ -1,4 +1,5 @@
 // lib/core.js — Core business logic for Pincushion
+// 2026-11-17: assign_pin_to_agent is not a metered AI action.
 // Pure functions for annotation management, testable and config-driven
 
 import { chmod, readFile, writeFile, readdir, rename, unlink } from 'fs/promises';
@@ -143,8 +144,8 @@ function rejectedTerminalMutation(annotationId, status) {
 // Never throws; this is retained for local-only and new-pin compatibility.
 // Existing lifecycle writes use the remote-first receipt path below. Most
 // legacy callers fire-and-forget, but the return value carries the outcome so METERED tools
-// (assign_pin_to_agent, add_bot_reply, create_critique_pin,
-// record_pin_verification) can await it and surface a 402 quota_exceeded
+// (add_bot_reply, create_critique_pin, record_pin_verification) can await it
+// and surface a 402 quota_exceeded. assign_pin_to_agent is free on every plan.
 // (free AI-action pool exhausted) instead of silently not syncing:
 //   { ok: true } | { ok: false, status, body } — body is the parsed JSON
 //   error (e.g. { error: 'quota_exceeded', used, cap, resets_at, upgrade_url })
@@ -241,7 +242,7 @@ export function resolveLifecycleAuthority(config = {}) {
       ok: false,
       error: 'authoritative_sync_required',
       reason: 'missing_credentials',
-      message: 'An authoritative sync URL and license are required before changing an existing pin. Local files were left unchanged. Sign in once with `npx -y pincushion-mcp login` (or `npx -y pincushion-mcp setup`), restart your editor, then retry.',
+      message: 'An authoritative sync URL and license are required before changing an existing pin. Local files were left unchanged. Sign in once with `npx -y pincushion-mcp@latest login` (or `npx -y pincushion-mcp@latest setup`), restart your editor, then retry.',
     };
   }
   try {
@@ -6443,7 +6444,7 @@ export async function toolConfigureProject(config, {
   // Push to Supabase so the extension can pick up the URL registrations
   const supabaseBase = config.supabaseBase || 'https://dpsqzszdviltqvethxbr.supabase.co/functions/v1';
   const fetchImpl = config.fetchImpl || fetch;
-  let cloudStatus = 'skipped — not signed in. Run `npx pincushion-mcp login` to enable cloud sync (shared projects, pins, share reports).';
+  let cloudStatus = 'skipped — not signed in. Run `npx -y pincushion-mcp@latest login` to enable cloud sync (shared projects, pins, share reports).';
   if (licenseKey) {
     try {
       const resp = await fetchImpl(`${supabaseBase}/sync-annotations/projects`, {
@@ -6491,7 +6492,7 @@ export async function toolConfigureProject(config, {
         // unrecognized license and for "you don't own this project". Use only
         // the provider's allowlisted code to select a fixed recovery hint.
         const ownerHint = 'You are not the owner of this project. Use a different name to create your own, or pass a projectId you own/edit.';
-        const loginHint = 'run `npx pincushion-mcp login` (or set PINCUSHION_LICENSE_KEY / ~/.pincushion/license-key).';
+        const loginHint = 'run `npx -y pincushion-mcp@latest login` (or set PINCUSHION_LICENSE_KEY / ~/.pincushion/license-key).';
         const looksLikeLicense = ['invalid_license', 'license_required', 'license_key_required'].includes(providerError?.error);
         const hint = projectLimit
           ? projectLimit
@@ -6777,8 +6778,8 @@ export async function toolConfigureProject(config, {
         // SAME account that owns this project. Because sign-in returns the same
         // license key per Google email, "same account" is the whole trick — and the
         // #1 reason a fresh install configures a project but never sees the FAB.
-        ? `To make the pin UI appear on these URLs: open the Pincushion extension and sign in with Google using the SAME email address you used for \`npx pincushion-mcp login\`. Same account = same workspace = the FAB activates automatically (within ~30s). No browser extension at all? Drop the embedded widget on your page instead — ask me for the Pincushion widget snippet (projectId ${projectId}) to capture a real pin with no install.`
-        : `Not signed in, so this project is saved locally only and the extension can't see it yet. Run \`npx pincushion-mcp login\` to sync, then sign the extension into that same account so the pin UI activates on these URLs.`,
+        ? `To make the pin UI appear on these URLs: open the Pincushion extension and sign in with Google using the SAME email address you used for \`npx -y pincushion-mcp@latest login\`. Same account = same workspace = the FAB activates automatically (within ~30s). No browser extension at all? Drop the embedded widget on your page instead — ask me for the Pincushion widget snippet (projectId ${projectId}) to capture a real pin with no install.`
+        : `Not signed in, so this project is saved locally only and the extension can't see it yet. Run \`npx -y pincushion-mcp@latest login\` to sync, then sign the extension into that same account so the pin UI activates on these URLs.`,
     ].join('\n\n') + deployInstructions,
   };
 }
@@ -7302,7 +7303,7 @@ export async function toolUpdateCritiqueContext(config, {
   // authoritative if the user is offline.
   const supabaseBase = config.supabaseBase || 'https://dpsqzszdviltqvethxbr.supabase.co/functions/v1';
   const licenseKey = config.licenseKey || null;
-  let cloudStatus = 'skipped — not signed in. Run `npx pincushion-mcp login` to enable cloud sync (shared projects, pins, share reports).';
+  let cloudStatus = 'skipped — not signed in. Run `npx -y pincushion-mcp@latest login` to enable cloud sync (shared projects, pins, share reports).';
   if (licenseKey) {
     try {
       const resp = await fetch(`${supabaseBase}/sync-annotations/projects`, {

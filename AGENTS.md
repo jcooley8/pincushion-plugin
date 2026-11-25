@@ -19,8 +19,22 @@ Code, Codex and Cursor. All three hosts install the same plugin folder.
   smithery.yaml and test-*.mjs). Its source lives in the private monorepo;
   never edit it here.
 - `pincushion-grok/` is the separate Grok plugin. The root `server.js`, `lib/`,
-  `commands/` and root `package.json` are legacy and not used by any
-  marketplace entry.
+  `commands/`, root `.mcp.json`, root `.claude-plugin/plugin.json` and root
+  `package.json` are legacy and not used by any marketplace entry.
+
+## Generated files
+
+The private monorepo publishes these paths on every plugin release, so a
+change made only here is overwritten by the next publish. Make it in the
+monorepo instead (`pincushion-agent-plugin/`):
+
+- `.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`,
+  `.cursor-plugin/marketplace.json`
+- `plugins/pincushion/`, including `server/`, `package.json` and
+  `package-lock.json`, which are built from the published `pincushion-mcp`
+  npm package
+- `README.md`, `llms-install.md`, `AGENTS.md`, `server.json` and
+  `tests/plugin-manifests.test.mjs`, `tests/onboarding-surfaces.test.mjs`
 
 ## Rules
 
@@ -30,8 +44,10 @@ Code, Codex and Cursor. All three hosts install the same plugin folder.
 - Never ask for or write a license key in a skill, manifest or MCP config.
 - Keep every manifest version, the Codex and Cursor `pincushion-mcp@<version>`
   pins, `package.json`/`package-lock.json`, `server.json` and the READMEs on the
-  same `pincushion-mcp` version. To update: replace `server/` from the new npm
-  tarball, keep `server/demo/`, then bump every reference.
+  same `pincushion-mcp` version. The monorepo's publish flow does this: it
+  replaces `server/` from the npm tarball (which includes `server/demo/`),
+  regenerates `package.json` and `package-lock.json` from the server's own
+  dependencies and lock snapshot, and bumps every reference.
 - Skills only name MCP tools the vendored server exposes.
 
 ## Validation

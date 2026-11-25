@@ -1,8 +1,27 @@
+<!-- 2026-11-23: released 1.15.0 so setup commands install the latest package, old copies warn, and agents read pins right after project setup. -->
 # Changelog
 
 All notable changes to `pincushion-mcp` are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
 
 ## [Unreleased]
+
+## [1.15.0] — 2026-11-23
+
+### Added
+
+- The server checks npm's `latest` version in the background when it starts (2.5-second timeout, never blocks or fails startup). When the running copy is older it writes one `[update]` line to stderr naming both versions and the update command `npx -y pincushion-mcp@latest setup`, and `configure_project` results carry `updateAvailable` with the same command. `PINCUSHION_NO_UPDATE_CHECK=1` turns the check off; it is also off under test runners and CI. `setup` prints the same warning before it starts.
+- When the project is registered in the Pincushion cloud (`cloudSync` is `synced`), `configure_project` results now tell the agent what to do next (`nextSteps`, also at the start of `instructions`): call `get_actionable_pins` now and tell the owner what is on the project. A project saved only locally (not signed in, plan limit, sign-in or network error) gets no such step, because neither pins nor the widget can reach it. For a project whose URLs are only localhost, it also offers to add the one-line pin widget to the app with the user's approval, so the developer can drop a real pin.
+
+### Changed
+
+- Every setup command the package prints or documents is `npx -y pincushion-mcp@latest …` (setup, claim, license, quickstart, one-click setup, `get_setup_instructions`, the desktop bundle and the README). A bare `npx pincushion-mcp` could run a months-old cached copy; a Nov 22 signup ran 1.11.16 and never got the newer guided setup.
+
+## [1.14.1] — 2026-11-17
+
+### Fixed
+
+- The npm package `repository`, `bugs`, and `homepage` point at the public repository https://github.com/jcooley8/pincushion-plugin and https://www.pincushion.io. They pointed at the private monorepo, so those links on the npm page returned 404. The repository link is the public repo root: that repo has no `pincushion-mcp` directory, and a `directory` field would 404 too. The desktop bundle `manifest.json` repository URL uses the same public repository.
+- The MCP initialize handshake reports `serverInfo.version` from this package's `package.json`. It was hardcoded to `1.0.0`.
 
 ## [1.14.0] — 2026-11-11
 

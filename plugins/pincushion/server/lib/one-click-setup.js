@@ -4,7 +4,7 @@
 // logs or returns a license key. The first-crit session below sends the
 // signed-in key only in the body of two Supabase functions the caller names
 // (validate-license for the account email, claim-report for the findings),
-// the same way `npx pincushion-mcp claim` already does, plus the
+// the same way `npx -y pincushion-mcp@latest claim` already does, plus the
 // X-License-Key header of one projects-only sync read for the target
 // project's URLs (readProjectSiteUrls), as every sync request sends it.
 //
@@ -247,7 +247,7 @@ export async function queuePublicCrit(url, fetchImpl = fetch, { email, critUrl =
     status: typeof body.status === 'string' ? body.status : 'queued',
     token,
     reportUrl: typeof body.reportUrl === 'string' ? body.reportUrl : null,
-    message: 'Pincushion AI is reviewing this page for your account. It usually takes about 4 minutes. Poll get_first_crit_status with this token.',
+    message: 'Pincushion AI is reviewing this page for your account. It usually takes 2 to 4 minutes, longer for big pages. Poll get_first_crit_status with this token.',
     poll: { tool: 'get_first_crit_status', token },
   };
 }
@@ -535,7 +535,7 @@ function siteRuleRefusal(kind, { target, host, outcome, retry, ledgerFile }) {
   const label = targetLabel(target);
   if (kind === 'project_urls_unknown') {
     const which = target.source === 'configured'
-      ? 'ask the user which project this folder should use and to run npx pincushion-mcp setup in this folder to change it'
+      ? 'ask the user which project this folder should use and to run npx -y pincushion-mcp@latest setup in this folder to change it'
       : 'ask the user which project this folder should use and call confirm_project_setup for it';
     return {
       error: 'project_urls_unknown',

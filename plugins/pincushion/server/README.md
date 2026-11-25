@@ -23,7 +23,7 @@ Resolving a pin records the commit, branch and PR. An optional post-deploy check
 1. **Connect your agent with one command.** In your project folder, run:
 
    ```bash
-   npx -y pincushion-mcp setup --ref readme
+   npx -y pincushion-mcp@latest setup --ref readme
    ```
 
    It signs you in, lists your projects (or creates one), and configures your coding agent to use Pincushion.
@@ -32,11 +32,11 @@ Resolving a pin records the commit, branch and PR. An optional post-deploy check
 
 No site feedback yet? Get a free AI crit of your site: https://www.pincushion.io/crit?ref=readme
 
-Try it with no account: add `npx -y pincushion-mcp` to your agent's MCP config and ask *"Show my Pincushion pins."* With no pins yet, it shows a sample pin you can fix with `start_quickstart_demo` on a throwaway demo page. Reading pins works without an account, but `claim_pin` and `fix_and_resolve` change a pin on the server, so they need `npx -y pincushion-mcp login` first.
+Try it with no account: add `npx -y pincushion-mcp@latest` to your agent's MCP config and ask *"Show my Pincushion pins."* With no pins yet, it shows a sample pin you can fix with `start_quickstart_demo` on a throwaway demo page. Reading pins works without an account, but `claim_pin` and `fix_and_resolve` change a pin on the server, so they need `npx -y pincushion-mcp@latest login` first.
 
 Requires Node.js 22.22+ or Node.js 24.
 
-Running from an agent or CI shell with no terminal? `setup` prints copy-paste steps instead: sign in with `login`, then add the server with `claude mcp add --scope project pincushion -- npx -y pincushion-mcp --project-dir .` (Claude Code) or a `.cursor/mcp.json` entry (Cursor).
+Running from an agent or CI shell with no terminal? `setup` prints copy-paste steps instead: sign in with `login`, then add the server with `claude mcp add --scope project pincushion -- npx -y pincushion-mcp@latest --project-dir .` (Claude Code) or a `.cursor/mcp.json` entry (Cursor).
 
 ### Prefer the app?
 
@@ -46,32 +46,32 @@ Running from an agent or CI shell with no terminal? `setup` prints copy-paste st
 - **Command.** In your project folder, run the command the tab shows:
 
   ```bash
-  npx -y pincushion-mcp setup --project-id <your-project-id>
+  npx -y pincushion-mcp@latest setup --project-id <your-project-id>
   ```
 
-Each developer signs in once with `npx -y pincushion-mcp login`; setup does this for you. Create invite links on the project's **People** tab.
+Each developer signs in once with `npx -y pincushion-mcp@latest login`; setup does this for you. Create invite links on the project's **People** tab.
 
 ### Optional: a first AI critique
 
-After connecting, setup offers to run a first AI critique of your site through the agent you chose. It captures desktop and mobile screenshots, saves findings as pins in your project, and opens a private report. It uses your agent's own model access and your Pincushion plan's AI actions. To run it later, run `npx -y pincushion-mcp setup` again and accept the critique. Once installed, it's also available in your agent as `/pincushion-critique <url>` (Claude Code, Cursor, VS Code) or `$pincushion-critique <url>` (Codex).
+After connecting, setup offers to run a first AI critique of your site through the agent you chose. It captures desktop and mobile screenshots, saves findings as pins in your project, and opens a private report. It uses your agent's own model access and your Pincushion plan's AI actions. To run it later, run `npx -y pincushion-mcp@latest setup` again and accept the critique. Once installed, it's also available in your agent as `/pincushion-critique <url>` (Claude Code, Cursor, VS Code) or `$pincushion-critique <url>` (Codex).
 
 Capture screenshots only, with no findings or uploads:
 
 ```bash
-npx -y pincushion-mcp capture https://your-site.example ./captures
+npx -y pincushion-mcp@latest capture https://your-site.example ./captures
 ```
 
-Capture uses an installed Chrome or Chromium on macOS or Linux; Windows capture isn't supported yet. To capture pages behind a sign-in, save the session once with `npx -y pincushion-mcp snapshot --login <url> --proof-selector <selector-only-shown-when-signed-in>`, then add `--require-auth`.
+Capture uses an installed Chrome or Chromium on macOS or Linux; Windows capture isn't supported yet. To capture pages behind a sign-in, save the session once with `npx -y pincushion-mcp@latest snapshot --login <url> --proof-selector <selector-only-shown-when-signed-in>`, then add `--require-auth`.
 
 ## Installation
 
-`npx -y pincushion-mcp` always runs the latest version, which is what the setup command and the committed config use. To install it globally instead:
+`npx -y pincushion-mcp@latest` always fetches the latest version. Plain `npx pincushion-mcp` reuses whatever copy npx cached the first time, which can be months old, so the setup commands here all say `@latest`. When the server or `setup` finds it is older than npm's latest, it says so and prints the update command (set `PINCUSHION_NO_UPDATE_CHECK=1` to turn that check off). To install it globally instead:
 
 ```bash
 npm install -g pincushion-mcp     # or: pnpm add -g pincushion-mcp / yarn global add pincushion-mcp
 ```
 
-Run `npx -y pincushion-mcp --help` for every command.
+Run `npx -y pincushion-mcp@latest --help` for every command.
 
 ### More ways to collect feedback
 
@@ -102,7 +102,7 @@ browser availability, or any upload receipt is uncertain.
 
 ### OpenAI Codex (native MCP)
 
-Run `npx -y pincushion-mcp setup` in the project and select **Codex**. It writes
+Run `npx -y pincushion-mcp@latest setup` in the project and select **Codex**. It writes
 `.codex/config.toml` with the acknowledged project ID. A clean manual entry is:
 
 ```toml
@@ -214,13 +214,13 @@ or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 Run this command to add Pincushion to Claude Code:
 
 ```bash
-claude mcp add pincushion -- npx pincushion-mcp --project-dir . --ref readme
+claude mcp add pincushion -- npx -y pincushion-mcp@latest --project-dir . --ref readme
 ```
 
 Or with Supabase sync:
 
 ```bash
-claude mcp add pincushion -- npx pincushion-mcp --project-dir . --sync-url https://your-supabase.com/api --api-key YOUR_API_KEY
+claude mcp add pincushion -- npx -y pincushion-mcp@latest --project-dir . --sync-url https://your-supabase.com/api --api-key YOUR_API_KEY
 ```
 
 ### VS Code (Copilot / Continue)
@@ -273,7 +273,7 @@ claude mcp add pincushion -- npx pincushion-mcp --project-dir . --sync-url https
 For tools that don't support MCP directly, use the REST API wrapper:
 
 ```bash
-npx pincushion-mcp --rest --port 3456
+npx -y pincushion-mcp@latest --rest --port 3456
 ```
 
 This starts an HTTP server on `127.0.0.1:3456`. It prints the path to a
@@ -334,12 +334,12 @@ npx pincushion-mcp [flags]
 
 **Local project:**
 ```bash
-npx pincushion-mcp --project-dir /path/to/project
+npx -y pincushion-mcp@latest --project-dir /path/to/project
 ```
 
 **With Supabase sync:**
 ```bash
-npx pincushion-mcp \
+npx -y pincushion-mcp@latest \
   --project-dir /path/to/project \
   --sync-url https://abcd1234.supabase.co/api \
   --api-key sb_project_key_abc123...
@@ -347,7 +347,7 @@ npx pincushion-mcp \
 
 **REST API server:**
 ```bash
-npx pincushion-mcp --rest --port 8080
+npx -y pincushion-mcp@latest --rest --port 8080
 ```
 
 ---
@@ -363,7 +363,7 @@ of raw pixels.
 **Headless (one command, CI-able):**
 
 ```bash
-npx pincushion-mcp mobile-wall run     # first run scaffolds crit-wall/wall.plan.json
+npx -y pincushion-mcp@latest mobile-wall run     # first run scaffolds crit-wall/wall.plan.json
 ```
 
 `wall.plan.json` declares the whole session: the app (`bundleId`, optional
@@ -382,17 +382,17 @@ CI don't need `JAVA_HOME` exported.
 
 ```bash
 # 1. Boot your app in the iOS simulator, navigate to a screen, then:
-npx pincushion-mcp mobile-wall capture 01-first-launch
-npx pincushion-mcp mobile-wall capture 02-connect        # …repeat per screen
+npx -y pincushion-mcp@latest mobile-wall capture 01-first-launch
+npx -y pincushion-mcp@latest mobile-wall capture 02-connect        # …repeat per screen
 
 # 2. Generate the wall:
-npx pincushion-mcp mobile-wall build --name "My App"
+npx -y pincushion-mcp@latest mobile-wall build --name "My App"
 ```
 
 **Publish after the app PR merges:**
 
 ```bash
-PINCUSHION_LICENSE_KEY=... npx pincushion-mcp mobile-wall publish \
+PINCUSHION_LICENSE_KEY=... npx -y pincushion-mcp@latest mobile-wall publish \
   --snapshot crit-wall-snapshot.jpg \
   --deploy-command "vercel deploy --prod" \
   --resolve-implemented \
@@ -833,7 +833,7 @@ To sync annotations with a remote Supabase database:
 
 **Example:**
 ```bash
-npx pincushion-mcp \
+npx -y pincushion-mcp@latest \
   --project-dir . \
   --sync-url https://your-project.supabase.co/rest/v1 \
   --api-key sb_project_key_abc123...
@@ -848,7 +848,7 @@ The server merges local `.feedback/` files with remote data, with remote taking 
 Pincushion Pro includes additional features. Activate with `--license-key`:
 
 ```bash
-npx pincushion-mcp --project-dir . --license-key YOUR_PRO_KEY
+npx -y pincushion-mcp@latest --project-dir . --license-key YOUR_PRO_KEY
 ```
 
 ---
@@ -923,7 +923,7 @@ Or use `npx` to let it find the package:
 
 ## Development
 
-Install the published server with npm (`npx -y pincushion-mcp`). The canonical source repository is private, so a public clone of it returns 404.
+Install the published server with npm (`npx -y pincushion-mcp@latest`). The canonical source repository is private, so a public clone of it returns 404.
 
 The public distribution mirror is [jcooley8/pincushion-plugin](https://github.com/jcooley8/pincushion-plugin). It is not guaranteed to match the latest version on npm. Check with `npm view pincushion-mcp version`.
 

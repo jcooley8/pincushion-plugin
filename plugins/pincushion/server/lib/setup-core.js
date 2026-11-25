@@ -239,8 +239,8 @@ export function getEditorChoice(value) {
 
 export function editorManualCommand(editor) {
   return normalizeEditorChoice(editor) === 'codex'
-    ? 'codex mcp add pincushion -- npx -y pincushion-mcp --project-dir .'
-    : 'npx -y pincushion-mcp --project-dir .';
+    ? 'codex mcp add pincushion -- npx -y pincushion-mcp@latest --project-dir .'
+    : 'npx -y pincushion-mcp@latest --project-dir .';
 }
 
 export function isAutoConfigurableEditor(editor) {
@@ -497,7 +497,7 @@ export function buildSignInRequiredExit() {
     'Setup needs a Pincushion account: your agent reads pins from your projects,',
     'so there is nothing to connect until you sign in.',
     '',
-    'When you are ready, resume with:  npx pincushion-mcp setup   (or  npx pincushion-mcp login)',
+    'When you are ready, resume with:  npx -y pincushion-mcp@latest setup   (or  npx -y pincushion-mcp@latest login)',
     'Want to see it work first? Ask your agent to "run the Pincushion quickstart" —',
     'a ~60-second demo that needs no account.',
   ].join('\n');
@@ -505,16 +505,16 @@ export function buildSignInRequiredExit() {
 
 export function buildManualSteps() {
   return [
-    'Pincushion setup needs an interactive terminal. To see a pin with no account, add `npx -y pincushion-mcp` to your agent and ask "Show my Pincushion pins", or call start_quickstart_demo.',
+    'Pincushion setup needs an interactive terminal. To see a pin with no account, add `npx -y pincushion-mcp@latest` to your agent and ask "Show my Pincushion pins", or call start_quickstart_demo.',
     'To connect this code:',
-    '  1. In a terminal, run: npx -y pincushion-mcp setup --ref readme',
+    '  1. In a terminal, run: npx -y pincushion-mcp@latest setup --ref readme',
     '     # sign in, pick a project, and choose Claude Code, Cursor, VS Code, or Codex',
     '     or create a project in the Pincushion app (https://www.pincushion.io/app) and copy its setup command.',
-    '     No terminal here? Sign in once with: npx -y pincushion-mcp login',
+    '     No terminal here? Sign in once with: npx -y pincushion-mcp@latest login',
     '  2. Add the server to your client, from your project directory:',
-    '       Claude Code:  claude mcp add --scope project pincushion -- npx -y pincushion-mcp --project-dir .',
-    '       Cursor:       add the server to .cursor/mcp.json: {"mcpServers":{"pincushion":{"command":"npx","args":["-y","pincushion-mcp","--project-dir","."]}}}',
-    '       Codex:        codex mcp add pincushion -- npx -y pincushion-mcp --project-dir .',
+    '       Claude Code:  claude mcp add --scope project pincushion -- npx -y pincushion-mcp@latest --project-dir .',
+    '       Cursor:       add the server to .cursor/mcp.json: {"mcpServers":{"pincushion":{"command":"npx","args":["-y","pincushion-mcp@latest","--project-dir","."]}}}',
+    '       Codex:        codex mcp add pincushion -- npx -y pincushion-mcp@latest --project-dir .',
     `       Any other MCP client: ${editorManualCommand('manual')}`,
     '  3. Restart your editor, then ask the agent to call get_actionable_pins.',
   ].join('\n');

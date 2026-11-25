@@ -139,7 +139,7 @@ export function buildQuickstartInvitation() {
 // command that signs in, creates or picks a project and connects this agent.
 // `--ref mcp-local` is the setup attribution slug; nothing new leaves the
 // machine until the user runs it.
-export const MCP_LOCAL_SETUP_COMMAND = 'npx -y pincushion-mcp setup --ref mcp-local';
+export const MCP_LOCAL_SETUP_COMMAND = 'npx -y pincushion-mcp@latest setup --ref mcp-local';
 export const MCP_LOCAL_CRIT_URL = 'https://www.pincushion.io/crit?ref=mcp-local';
 
 // Short enough for an agent to paste to the user verbatim. The agent may have
@@ -213,11 +213,11 @@ export function buildDemoResolvedPayload({ fixDescription = '', diff = '', store
     diff: diff || undefined,
     nextStep: {
       headline: 'Now do it on YOUR app:',
-      step1: 'Have a critique report? Run `npx pincushion-mcp claim <report-token>` in its repository. Starting without a report? Run `npx pincushion-mcp setup` and explicitly choose your editor.',
+      step1: 'Have a critique report? Run `npx -y pincushion-mcp@latest claim <report-token>` in its repository. Starting without a report? Run `npx -y pincushion-mcp@latest setup` and explicitly choose your editor.',
       step2: `Confirm authenticated access to the intended project after restarting your editor if needed. The browser extension is optional for new feedback: ${storeUrl || 'https://www.pincushion.io/install/chrome'}`,
       step3: 'A first project claimed from an AI crit starts with its AI findings approved (except any someone else replied to): ask your agent to read one and implement it. For any other finding, explicitly approve it first, ask your agent to read that exact pin, then implement it. Record deployment and verification separately.',
       activationTip: 'If you choose the optional extension, sign in with Google using the same email address as your Pincushion account. Extension installation is not an activation milestone.',
-      oneCommandSetup: 'Without a report, run `npx pincushion-mcp setup` in the intended repository. Select your editor; supported configuration preserves unrelated settings. Others receive a manual path. Configuration written does not prove project access or an exact-pin read.',
+      oneCommandSetup: 'Without a report, run `npx -y pincushion-mcp@latest setup` in the intended repository. Select your editor; supported configuration preserves unrelated settings. Others receive a manual path. Configuration written does not prove project access or an exact-pin read.',
       // Extension-free path: a paste-able widget that writes a REAL pin straight
       // from the page. Skips the activation cliff for a first real pin.
       noExtensionTip: projectId

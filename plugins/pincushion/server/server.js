@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 // server.js — Pincushion MCP Server
+// 2026-11-17: assign_pin_to_agent is free on every plan and is not in METERED_TOOLS.
+// 2026-11-17: initialize serverInfo.version reads package.json (PKG_VERSION).
+// It was hardcoded to 1.0.0, so clients reported the wrong server version.
 // 2026-11-03: sign_in, propose_project_setup, confirm_project_setup,
 // start_first_crit, get_first_crit_status, list_setup_pins, and invite_teammate
 // replace the terminal setup wizard for agents. These tools are not metered.
@@ -14,9 +17,9 @@
 //   npx pincushion-mcp [--project-dir /path/to/project] [--sync-url https://...] [--api-key KEY] [--license-key KEY] [--rest --port 3456]
 //
 // Examples:
-//   npx pincushion-mcp --project-dir .
-//   npx pincushion-mcp --project-dir /path --sync-url https://sync.example.com --api-key abc123
-//   npx pincushion-mcp --rest --port 3456
+//   npx -y pincushion-mcp@latest --project-dir .
+//   npx -y pincushion-mcp@latest --project-dir /path --sync-url https://sync.example.com --api-key abc123
+//   npx -y pincushion-mcp@latest --rest --port 3456
 //
 // Claude Desktop config (~/.config/Claude/claude_desktop_config.json):
 //   {
@@ -42,6 +45,8 @@ import {
   reusableSetupProjectId,
   siteKeysOf,
 } from './lib/one-click-setup.js';
+import { checkLatestVersion, outdatedNotice } from './lib/update-check.js';
+import { withConfigureNextSteps } from './lib/configure-next-steps.js';
 import {
   createAgentHostLedger,
   createFirstCritJobStore,
@@ -186,7 +191,7 @@ if (process.argv[2] === 'remote-url' || process.argv[2] === 'mcp-url') {
     try { key = readFileSync(keyFile, 'utf8').trim(); } catch { /* handled below */ }
   }
   if (!key) {
-    console.error('No Pincushion login key found. Run `npx -y pincushion-mcp setup` first (it signs you in).');
+    console.error('No Pincushion login key found. Run `npx -y pincushion-mcp@latest setup` first (it signs you in).');
     process.exit(1);
   }
   // By default print a key-free URL: the key belongs in a header, because a
@@ -205,7 +210,7 @@ if (process.argv[2] === 'remote-url' || process.argv[2] === 'mcp-url') {
     '',
     'Send your key as a header, not in the URL:',
     `  Authorization: Bearer <contents of ${keyFile}>`,
-    'If your MCP client accepts only a URL, run `npx pincushion-mcp remote-url --embed-key` instead.',
+    'If your MCP client accepts only a URL, run `npx -y pincushion-mcp@latest remote-url --embed-key` instead.',
   ].join('\n'));
   process.exit(0);
 }
@@ -1338,7 +1343,7 @@ async function cloudSyncPullLocked({ forceBootstrap = false, assertOwned, restar
         cloudLicenseRejected = true;
         cloudLicenseRejectedInfo = { source: keySource, last4: keyLast4(licenseKey) };
         setCloudAuthState('rejected', { source: keySource, key: licenseKey, reason: rejectionReason });
-        console.error(`[cloud-sync] License key (…${keyLast4(licenseKey)}, from ${keySourceLabel(keySource)}) was rejected — run \`npx pincushion-mcp login\` to refresh it, or disable sync with --no-cloud-sync`);
+        console.error(`[cloud-sync] License key (…${keyLast4(licenseKey)}, from ${keySourceLabel(keySource)}) was rejected — run \`npx -y pincushion-mcp@latest login\` to refresh it, or disable sync with --no-cloud-sync`);
       }
       if (resp.status !== 401 && resp.status !== 403) {
         setCloudAuthState('unavailable', { source: keySource, key: licenseKey, reason: 'cloud_inaccessible' });
@@ -1673,14 +1678,14 @@ if (CLOUD_SYNC || resolveCloudSyncKey()) {
       source: cloudLicenseRejectedInfo?.source || 'none',
       key: null,
     });
-    console.error('[cloud-sync] Cloud sync requested but no license key found. Run `npx -y pincushion-mcp setup` to sign in and connect (or set PINCUSHION_LICENSE_KEY / ~/.pincushion/license-key).');
+    console.error('[cloud-sync] Cloud sync requested but no license key found. Run `npx -y pincushion-mcp@latest setup` to sign in and connect (or set PINCUSHION_LICENSE_KEY / ~/.pincushion/license-key).');
   }
 } else {
   setCloudAuthState('unavailable', { source: 'none', key: null });
   // No key and cloud sync not requested: a fresh install. Don't fail silently —
   // tell the user exactly how to turn on cloud features. (Without this, a new
   // user thinks everything works while projects/pins/share-reports never sync.)
-  console.error('[pincushion] Running local-only — not signed in. Cloud projects, pins, and share reports are off. From your agent, call the sign_in tool; or run `npx -y pincushion-mcp setup` in your project folder to sign in, pick a project and connect your agent.');
+  console.error('[pincushion] Running local-only — not signed in. Cloud projects, pins, and share reports are off. From your agent, call the sign_in tool; or run `npx -y pincushion-mcp@latest setup` in your project folder to sign in, pick a project and connect your agent.');
 
   // A4 (first-5-users / install→signup leak): when a HUMAN runs this interactively
   // in a terminal — not an IDE spawning it over a stdio pipe, not CI — auto-open
@@ -1703,13 +1708,13 @@ if (CLOUD_SYNC || resolveCloudSyncKey()) {
       const { runLogin } = await import('./login.mjs');
       const code = await runLogin();
       if (code === 0) {
-        console.error('[pincushion] Signed in. To continue a critique, run `npx pincushion-mcp claim <report-token>` in its repository. Starting without a report? Run `npx pincushion-mcp setup` and choose your editor.');
+        console.error('[pincushion] Signed in. To continue a critique, run `npx -y pincushion-mcp@latest claim <report-token>` in its repository. Starting without a report? Run `npx -y pincushion-mcp@latest setup` and choose your editor.');
         console.error('[pincushion] Authentication is complete; project access, exact-pin reads, implementation, and deployment are separate checks. The browser extension is optional.');
         // Exiting: drain the sign-in events first, as `login` does.
         await shutdownPostHog();
         process.exit(0);
       }
-      console.error('[pincushion] Sign-in not completed — continuing local-only. Run `npx -y pincushion-mcp setup` anytime to finish.');
+      console.error('[pincushion] Sign-in not completed — continuing local-only. Run `npx -y pincushion-mcp@latest setup` anytime to finish.');
     } catch (e) {
       console.error('[pincushion] Could not start sign-in:', e?.message || e, '— continuing local-only.');
     }
@@ -2303,6 +2308,23 @@ async function waitForBootClientName() {
   return bootMcpClientName();
 }
 
+// Is this copy older than npm's latest? `npx -y pincushion-mcp@latest` without a version
+// reuses an old cached copy indefinitely, so say so: once on stderr, as a
+// telemetry event (no user data), and at the top of the configure_project
+// result so the agent can tell the owner. Bounded, non-blocking, skipped in
+// tests/CI and with PINCUSHION_NO_UPDATE_CHECK=1.
+let latestVersionResult = null;
+void checkLatestVersion({ current: PKG_VERSION }).then((result) => {
+  latestVersionResult = result;
+  if (result?.outdated) {
+    console.error(`[update] ${outdatedNotice(result)}`);
+    try {
+      captureEvent(getDistinctId(), 'mcp outdated', { version: result.current, latestVersion: result.latest, installId: getInstallId() });
+    } catch { /* telemetry is best-effort */ }
+  }
+  return result;
+}, () => null);
+
 const projectAutoDiscovery = (async () => {
   try {
     const discovered = await core.discoverProjectConfig(PROJECT_DIR);
@@ -2377,13 +2399,13 @@ const PRO_TOOLS = new Set([
   'list_members'
 ]);
 
+// 2026-11-17: assign_pin_to_agent is free on every plan. It is not in this set.
 // METERED_TOOLS consume the free tier's monthly AI-action pool (25/mo). This
 // pre-flight is pure UX — agents get a clean upgrade message before doing
 // local work; the authoritative gate is server-side in sync-annotations (or
 // the dedicated QA importer), which 402s the metered write itself. Manual pin tools (claim_pin,
-// fix_and_resolve, add_agent_reply, share reports, …) are never metered.
+// fix_and_resolve, add_agent_reply, assign_pin_to_agent, share reports, …) are never metered.
 const METERED_TOOLS = new Set([
-  'assign_pin_to_agent',
   'add_bot_reply',
   'create_critique_pin',
   'create_agent_pin',
@@ -2666,8 +2688,8 @@ async function awaitAnnotationBootstrap(timeoutMs = ANNOTATION_BOOTSTRAP_WAIT_MS
   return true;
 }
 
-async function fetchRemoteAnnotations() {
-  if (!await awaitAnnotationBootstrap()) throw authoritativeReadError({ reason: 'bootstrap_pending', detail: 'Annotation recovery has not completed.' });
+async function fetchRemoteAnnotations({ bootstrapDeadline = Date.now() + ANNOTATION_BOOTSTRAP_WAIT_MS, bootstrapRetried = false } = {}) {
+  if (!await awaitAnnotationBootstrap(Math.max(0, bootstrapDeadline - Date.now()))) throw authoritativeReadError({ reason: 'bootstrap_pending', detail: 'Annotation recovery has not completed.' });
   if (!SYNC_SERVER_URL) return {};
 
   const headers = { 'Content-Type': 'application/json', 'X-Pincushion-Client': `mcp/${PKG_VERSION}` };
@@ -2692,7 +2714,7 @@ async function fetchRemoteAnnotations() {
       }
       // Self-heal: fall a rejected explicit key through to the next source.
       if ((res.status === 401 || res.status === 403) && markCloudKeyRejected(licenseKey)) {
-        return fetchRemoteAnnotations();
+        return fetchRemoteAnnotations({ bootstrapDeadline, bootstrapRetried });
       }
       lastCloudSyncError = { status: res.status, detail, at: new Date().toISOString() };
       throw authoritativeReadError({ status: res.status, reason: `http_${res.status}`, detail });
@@ -2787,7 +2809,13 @@ async function fetchRemoteAnnotations() {
       }
       byPage[scopeKey].annotations.push(ann);
     }
-    if (await annotationBootstrapActive(ANNOTATIONS_DIR)) throw authoritativeReadError({ reason: 'bootstrap_pending', detail: 'Annotation recovery has not completed.' });
+    if (await annotationBootstrapActive(ANNOTATIONS_DIR)) {
+      // A bootstrap began while this read was in flight (the background
+      // poll's first pull, typically). Wait for it within the same bound and
+      // read again once, instead of failing a read that arrived first.
+      if (!bootstrapRetried) return fetchRemoteAnnotations({ bootstrapDeadline, bootstrapRetried: true });
+      throw authoritativeReadError({ reason: 'bootstrap_pending', detail: 'Annotation recovery has not completed.' });
+    }
     return byPage;
   } catch (err) {
     if (err?.code === 'authoritative_sync_unavailable') throw err;
@@ -3512,7 +3540,7 @@ const agentHostLedger = createAgentHostLedger();
 // cannot be written, nothing is changed.
 async function toolConfigureProjectFromTool(args = {}) {
   const urls = Array.isArray(args.urls) ? args.urls : [];
-  if (!siteKeysOf(urls).length) return toolConfigureProject(args);
+  if (!siteKeysOf(urls).length) return withConfigureNextSteps(await toolConfigureProject(args), { update: latestVersionResult });
   await ensureCloudAuthForTool();
   const projects = await readLocalProjects();
   const requestedId = typeof args.projectId === 'string' && args.projectId.trim() ? args.projectId.trim() : null;
@@ -3533,7 +3561,7 @@ async function toolConfigureProjectFromTool(args = {}) {
       message: `configure_project was not run and nothing was changed: the record of hosts that agents add to projects (${agentHostLedger.file}) could not be written (${persistenceReason(error)}). Fix that file or its folder, then call configure_project again.`,
     };
   }
-  return toolConfigureProject({ ...args, projectId });
+  return withConfigureNextSteps(await toolConfigureProject({ ...args, projectId }), { update: latestVersionResult });
 }
 
 const crit = critEndpoint(process.env.PINCUSHION_CRIT_URL);
@@ -3635,7 +3663,7 @@ async function toolConfirmProjectSetup({ confirmed, proposalId, projectId, activ
         error: 'folder_configured_for_other_project',
         configuredProjectId: DEFAULT_PROJECT_ID,
         proposalId: proposal.proposalId,
-        message: `This folder is configured for project ${DEFAULT_PROJECT_ID} (--project-id or PINCUSHION_PROJECT_ID in its MCP config), so project ${targetId} was not confirmed and nothing was changed. Pin reads and the first crit use ${DEFAULT_PROJECT_ID}. To use another project in this folder, run npx pincushion-mcp setup there to change its config, then restart the MCP server.`,
+        message: `This folder is configured for project ${DEFAULT_PROJECT_ID} (--project-id or PINCUSHION_PROJECT_ID in its MCP config), so project ${targetId} was not confirmed and nothing was changed. Pin reads and the first crit use ${DEFAULT_PROJECT_ID}. To use another project in this folder, run npx -y pincushion-mcp@latest setup there to change its config, then restart the MCP server.`,
       };
     }
     return {
@@ -3726,7 +3754,7 @@ async function toolGetSetupInstructions() {
     try_it_first: 'Have a critique report? Keep its findings open and use claim with that report token. The optional quickstart demo is for projects without existing findings.',
     quick_start: {
       step1: 'Call sign_in, then propose_project_setup. Show the detected name and URLs and call confirm_project_setup once with confirmed: true. Then show the user the public https page to review and, once they agree, call start_first_crit with that url and confirmed: true, and poll get_first_crit_status.',
-      step2: 'Call list_setup_pins. Each pin includes likely files plus app, page, and IDE links. invite_teammate returns one shareable link. From an existing critique report: npx pincushion-mcp claim <report-token>.'
+      step2: 'Call list_setup_pins. Each pin includes likely files plus app, page, and IDE links. invite_teammate returns one shareable link. From an existing critique report: npx -y pincushion-mcp@latest claim <report-token>.'
     },
     optional_extension: 'https://www.pincushion.io/install/chrome — optional for placing new feedback on other pages',
     milestones: ['configuration_written', 'authenticated_project_access', 'explicit_approval', 'exact_pin_mcp_read', 'implementation_recorded', 'deployed', 'verified'],
@@ -3751,16 +3779,16 @@ async function toolGetSetupInstructions() {
         description: 'Add this HTTP server to .vscode/mcp.json and sign in in the browser. Use stdio only for a localhost target.'
       },
       codex: {
-        command: 'codex mcp add pincushion -- npx -y pincushion-mcp --project-dir . --cloud-sync',
+        command: 'codex mcp add pincushion -- npx -y pincushion-mcp@latest --project-dir . --cloud-sync',
         mode: 'manual',
         description: 'Run this in the intended repository, then restart Codex and verify authenticated project access.'
       },
       windsurf: {
         file: '~/.codeium/windsurf/mcp_config.json',
-        content: { mcpServers: { pincushion: { command: 'npx', args: ['-y', 'pincushion-mcp', '--project-dir', '/absolute/path/to/project', '--cloud-sync'] } } },
+        content: { mcpServers: { pincushion: { command: 'npx', args: ['-y', 'pincushion-mcp@latest', '--project-dir', '/absolute/path/to/project', '--cloud-sync'] } } },
         documentation: 'https://docs.windsurf.com/windsurf/cascade/mcp',
         mode: 'manual',
-        description: 'Open Windsurf MCP settings and add the stdio command npx with arguments ["-y", "pincushion-mcp", "--project-dir", "/absolute/path/to/project", "--cloud-sync"]. No configuration file is written for you.'
+        description: 'Open Windsurf MCP settings and add the stdio command npx with arguments ["-y", "pincushion-mcp@latest", "--project-dir", "/absolute/path/to/project", "--cloud-sync"]. No configuration file is written for you.'
       },
       claude_desktop: {
         file: '~/Library/Application Support/Claude/claude_desktop_config.json (macOS)',
@@ -3768,7 +3796,7 @@ async function toolGetSetupInstructions() {
           mcpServers: {
             pincushion: {
               command: 'npx',
-              args: ['pincushion-mcp', '--project-dir', '/path/to/project', '--cloud-sync']
+              args: ['pincushion-mcp@latest', '--project-dir', '/path/to/project', '--cloud-sync']
             }
           }
         }
@@ -3879,7 +3907,7 @@ function configureProjectConnectionRequired(credentialCandidates) {
     reauthentication: {
       required: true,
       action: 'pincushion_login',
-      command: 'npx pincushion-mcp login',
+      command: 'npx -y pincushion-mcp@latest login',
       retryTool: 'configure_project',
       preservesCachedProjectIdentity: true,
       blocksProjectMutationUntilVerified: true,
@@ -5187,7 +5215,7 @@ async function toolPreviewCollaborationNotification({ provider = 'slack', event 
 // ─── MCP Server Definition ────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'pincushion', version: '1.0.0' },
+  { name: 'pincushion', version: PKG_VERSION },
   {
     // `instructions` is delivered in the initialize handshake and surfaced to the
     // model by most MCP clients — the only first-run surface that reaches the agent
@@ -6654,7 +6682,7 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
             '2. Read the pin\'s thread + acceptance criteria to me.',
             '3. grep `.feedback/.quickstart/landing.html` for the element selector, then edit ONLY that file to satisfy the acceptance criteria. Show me the diff.',
             '4. Call `resolve_quickstart_demo` with the pin\'s annotationId and a one-line fixDescription.',
-            '5. Continue an existing critique with `npx pincushion-mcp claim <report-token>`. If there is no report, offer `npx pincushion-mcp setup` and explicit editor selection. Use an existing AI or human finding before asking for another pin. Browser extension installation is optional; the demo is not activation.',
+            '5. Continue an existing critique with `npx -y pincushion-mcp@latest claim <report-token>`. If there is no report, offer `npx -y pincushion-mcp@latest setup` and explicit editor selection. Use an existing AI or human finding before asking for another pin. Browser extension installation is optional; the demo is not activation.',
             '',
             'This is a sandboxed demo — do NOT create real pins, call fix_and_resolve, or edit any file outside `.feedback/.quickstart/`.',
           ].join('\n') },

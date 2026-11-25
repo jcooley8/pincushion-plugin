@@ -7,7 +7,8 @@
 // artifact writes.
 
 import { randomUUID } from 'crypto';
-import { mkdir, readdir, rename, rm, stat, utimes, writeFile } from 'fs/promises';
+import { mkdir, readFile, readdir, rename, rm, stat, utimes, writeFile } from 'fs/promises';
+import { hostname } from 'os';
 import { join } from 'path';
 
 export const PINS_REFRESH_LEASE_DIR = '.pincushion-background-refresh-lease';
@@ -39,10 +40,41 @@ async function tokenMtime(leaseDir) {
   }
 }
 
+// A lease whose owner exited without releasing it (killed, crashed, or quit
+// mid-pull) would otherwise block every successor until its heartbeat ages out
+// a whole TTL later, and readers that wait on that lease fail meanwhile. The
+// token file names its owner, so a successor on the same host can tell that
+// the owner is gone. Anything it cannot verify (another host, an unreadable
+// or older file, a live pid) keeps the TTL rule.
+const LEASE_HOST = hostname();
+
+function processAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === 'EPERM';
+  }
+}
+
+async function ownerGone(leaseDir) {
+  try {
+    const names = await readdir(leaseDir);
+    if (names.length !== 1) return false;
+    const [, pidLine, hostLine] = (await readFile(join(leaseDir, names[0]), 'utf8')).split('\n');
+    const pid = Number(pidLine);
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+    if (hostLine !== LEASE_HOST) return false;
+    return !processAlive(pid);
+  } catch {
+    return false;
+  }
+}
+
 async function createLease(leaseDir, token, now, clock) {
   await mkdir(leaseDir);
   const tokenPath = join(leaseDir, token);
-  await writeFile(tokenPath, `${token}\n`, { encoding: 'utf8', mode: 0o600 });
+  await writeFile(tokenPath, `${token}\n${process.pid}\n${LEASE_HOST}\n`, { encoding: 'utf8', mode: 0o600 });
   const at = new Date(now);
   await utimes(tokenPath, at, at);
 
@@ -111,7 +143,7 @@ export async function acquirePinsRefreshLease({
     }
 
     const heartbeat = await tokenMtime(leaseDir);
-    const stale = heartbeat === null || nowClock() - heartbeat >= ttl;
+    const stale = heartbeat === null || nowClock() - heartbeat >= ttl || await ownerGone(leaseDir);
     if (!stale) {
       return { acquired: false, reclaimedStale: false, renew: async () => false, release: async () => false };
     }

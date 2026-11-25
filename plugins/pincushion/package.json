@@ -1,9 +1,9 @@
 {
   "name": "pincushion-plugin-runtime",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "private": true,
   "type": "module",
-  "description": "Runtime dependencies for the vendored pincushion-mcp 1.14.0 server in ./server. Claude Code installs these from package-lock.json when the plugin is installed.",
+  "description": "Runtime dependencies for the vendored pincushion-mcp 1.15.0 server in ./server. Claude Code installs these from package-lock.json when the plugin is installed.",
   "license": "SEE LICENSE IN server/LICENSE.md",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
@@ -15,5 +15,8 @@
   },
   "optionalDependencies": {
     "@supabase/supabase-js": "^2.45.0"
+  },
+  "engines": {
+    "node": "^22.22.0 || ^24.0.0"
   }
 }

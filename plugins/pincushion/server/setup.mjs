@@ -1,4 +1,4 @@
-// setup.mjs — `npx pincushion-mcp setup`, the one-command first-run wizard.
+// setup.mjs — `npx -y pincushion-mcp@latest setup`, the one-command first-run wizard.
 // Express flow: press Enter to start; project defaults can be accepted, but the
 // developer explicitly selects an editor and approves the real critique.
 // A non-interactive shell stops before sign-in and prints the manual steps,
@@ -13,13 +13,19 @@ import {
   detectProjectDefaults, writeEditorMcpConfig, buildManualSteps,
   buildSignInRequiredExit, getEditorChoice, normalizeEditorChoice,
 } from './lib/setup-core.js';
-import { captureConnectFailed, captureEvent } from './lib/posthog.js';
+import { captureConnectFailed, captureEvent, getInstallId } from './lib/posthog.js';
 import { recordDeveloperSetupIntent } from './login.mjs';
 import { installClientCritique, inspectCodexInheritedMcp } from './lib/client-critique-install.js';
 import { createSetupCritique, readSetupCritique, findSetupClient, launchSetupClient, readExistingSetupGeneration, finishSetupCritique, waitForSetupGeneration, findIncompleteSetupCritiques, acquireSetupContinuation, setupCritiqueServerEntry, inspectSetupCritique } from './lib/setup-critique.js';
 import { prepareSetupRuntime, readSetupRuntimeBinding, setupNodeRuntimeSupported } from './lib/setup-runtime.js';
 import { checkNodeRuntime } from './lib/node-runtime.js';
 import { rememberInstallRef } from './lib/install-ref.js';
+import { checkLatestVersion, outdatedNotice } from './lib/update-check.js';
+
+function packageVersion() {
+  try { return JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version || null; }
+  catch { return null; }
+}
 
 // Mirror server.js: respect the PINCUSHION_SYNC_URL override (and its default)
 // and strip the /sync-annotations suffix, so a developer pointing at a local
@@ -211,7 +217,7 @@ function remoteProjectIds(remoteProjects) {
 /**
  * Reconcile a standalone setup run with the authenticated cloud project list
  * before it can create or re-register an identity. MCP-server startup performs
- * the same projects_only hydration, but `npx pincushion-mcp setup` exits before
+ * the same projects_only hydration, but `npx -y pincushion-mcp@latest setup` exits before
  * that long-lived server process is ever started.
  */
 export async function hydrateSignedInSetupProjectIdentity({
@@ -405,7 +411,7 @@ export async function configureSignedInSetupProject({
     ? licenseKey.trim()
     : null;
   if (!activeLicenseKey) {
-    throw new Error('Pincushion sign-in is no longer available; no project was registered. Run `npx pincushion-mcp login` and retry setup.');
+    throw new Error('Pincushion sign-in is no longer available; no project was registered. Run `npx -y pincushion-mcp@latest login` and retry setup.');
   }
   const identity = await hydrateSignedInSetupProjectIdentity({
     cwd,
@@ -680,12 +686,20 @@ export async function runSetup(argv = [], opts = {}) {
 
   if (!input.isTTY) { output.write('This shell is not interactive, so setup stopped before sign-in. Nothing was changed and no critique was started.\n' + buildManualSteps() + '\n\n' + buildCollaborationCta() + '\n'); return 1; }
 
+  // An old copy cached by npx keeps running until someone says so (bounded,
+  // never blocks setup; skipped in tests/CI and with PINCUSHION_NO_UPDATE_CHECK=1).
+  const updateCheck = (opts.checkLatestVersion || checkLatestVersion)({ current: opts.version || packageVersion() });
   const rl = askOverride ? null : readline.createInterface({ input, output });
   const w = (s) => output.write(s);
   const askQuestion = (question) => askOverride ? Promise.resolve(askOverride(question)) : ask(rl, question);
   try {
     w('\n  Pincushion setup: connect this code to a Pincushion project and your coding agent.\n');
     w(`  Working directory: ${resolve(cwd)}\n`);
+    const update = await Promise.resolve(updateCheck).catch(() => null);
+    if (update?.outdated) {
+      w(`\n  ⚠ ${outdatedNotice(update)}\n`);
+      try { capture(getInstallId(), 'setup outdated', { version: update.current, latestVersion: update.latest }); } catch { /* telemetry is best-effort */ }
+    }
     await askQuestion('  Press Enter to start. ');
 
     // 1. Sign in — REQUIRED GATE. Everything after this needs a cloud account, so
@@ -875,7 +889,7 @@ export async function runSetup(argv = [], opts = {}) {
     let runtimeBinding;
     let editorResult = { action: 'skipped', path: '', editor: null };
     if (!selectedEditor) {
-      w(`     Skipped. Connect an agent later with: npx -y pincushion-mcp setup --project-id ${project.projectId}\n`);
+      w(`     Skipped. Connect an agent later with: npx -y pincushion-mcp@latest setup --project-id ${project.projectId}\n`);
       return 0;
     } else {
       if(selectedEditor === 'codex') {
